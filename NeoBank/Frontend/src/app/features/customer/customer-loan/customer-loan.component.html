@@ -1,0 +1,973 @@
+<!-- customer-loan.component.html -->
+
+<!-- ── Inline Alerts ── -->
+@if (error()) {
+  <div class="page-alert err">
+    <span>{{ error() }}</span>
+    <button (click)="error.set('')">✕</button>
+  </div>
+}
+@if (success()) {
+  <div class="page-alert ok">
+    <span>{{ success() }}</span>
+    <button (click)="success.set('')">✕</button>
+  </div>
+}
+
+<!-- ── Tab Bar ── -->
+<div class="ln-tabs">
+  <button class="ln-tab"
+    [class.ln-tab-active]="tab() === 'dashboard'"
+    (click)="switchTab('dashboard')">
+    📊 My Loans
+  </button>
+  <button class="ln-tab"
+    [class.ln-tab-active]="tab() === 'apply'"
+    (click)="switchTab('apply'); resetApply()">
+    + Apply
+  </button>
+  <button class="ln-tab"
+    [class.ln-tab-active]="tab() === 'schedule'"
+    [disabled]="!selectedLoan()"
+    (click)="tab.set('schedule')">
+    📅 EMI Schedule
+  </button>
+  <button class="ln-tab"
+    [class.ln-tab-active]="tab() === 'history'"
+    (click)="switchTab('history')">
+    📋 History
+  </button>
+</div>
+
+<!-- ════════════════════════════════
+     TAB 1 — DASHBOARD
+════════════════════════════════ -->
+@if (tab() === 'dashboard') {
+
+  <!-- Stats -->
+  <div class="stats-grid" style="margin-bottom:20px">
+    @for (s of statCards; track s.label) {
+      <div class="stat-card">
+        <div class="stat-icon">{{ s.icon }}</div>
+        <div>
+          <div class="stat-val">{{ s.val }}</div>
+          <div class="stat-lbl">{{ s.label }}</div>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- Loan list -->
+  @if (loansLoading()) {
+    <div class="ln-loading">
+      <div class="spin-ring"></div>
+      <p>Loading your loans...</p>
+    </div>
+  } @else if (loans().length === 0) {
+    <div class="section-head">
+          <div>
+      <h1>🏦 No Loans Yet</h1>
+      <p>Apply for a loan to get started with
+         affordable EMIs.</p>
+    </div>
+      <button class="ln-btn-primary"
+        (click)="switchTab('apply')">
+        + Apply for Loan
+      </button>
+    </div>
+  } @else {
+    <div class="loans-grid">
+      @for (loan of loans(); track loan.loanId) {
+        <div class="loan-card"
+          [class.lc-overdue]="loan.status==='OVERDUE'">
+
+          <!-- Card header -->
+          <div class="lc-head"
+            [style.background]="
+              'linear-gradient(135deg,' +
+              getProductColor(loan.loanType) + '18,' +
+              getProductColor(loan.loanType) + '06)'">
+            <div class="lch-left">
+              <span class="lch-icon">
+                {{ getProductIcon(loan.loanType) }}
+              </span>
+              <div>
+                <div class="lch-type">
+                  {{ loan.productName ?? loan.loanType }}
+                  Loan
+                </div>
+                <div class="lch-id">{{ loan.loanId }}</div>
+              </div>
+            </div>
+            <span class="st-badge"
+              [class]="getStatusClass(loan.status)">
+              {{ loan.status }}
+            </span>
+          </div>
+
+          <!-- Card body -->
+          <div class="lc-body">
+            <div class="lc-row">
+              <span>Principal</span>
+              <strong>{{ fmt(loan.principalAmount) }}</strong>
+            </div>
+
+            @if (loan.emiAmount) {
+              <div class="lc-row">
+                <span>Monthly EMI</span>
+                <strong class="lc-emi">
+                  {{ fmt(loan.emiAmount) }}
+                </strong>
+              </div>
+            }
+
+            @if (loan.outstandingBalance &&
+                 loan.status !== 'CLOSED') {
+              <div class="lc-row">
+                <span>Outstanding</span>
+                <strong>
+                  {{ fmt(loan.outstandingBalance) }}
+                </strong>
+              </div>
+            }
+
+            @if (loan.interestRate) {
+              <div class="lc-row">
+                <span>Interest Rate</span>
+                <strong>{{ loan.interestRate }}% p.a.</strong>
+              </div>
+            }
+
+            @if (loan.nextEmiDate &&
+                 loan.status === 'APPROVED') {
+              <div class="lc-row">
+                <span>Next EMI</span>
+                <strong class="lc-next-emi">
+                  {{ loan.nextEmiDate }}
+                </strong>
+              </div>
+            }
+
+            @if (loan.rejectionReason) {
+              <div class="lc-reason">
+                ❌ {{ loan.rejectionReason }}
+              </div>
+            }
+
+            <!-- Progress -->
+            @if (['APPROVED','OVERDUE',
+                  'CLOSED'].includes(loan.status)) {
+              <div class="lc-progress">
+                <div class="lcp-row">
+                  <span>EMIs: {{ loan.emisPaid }}
+                    / {{ loan.totalEmis }}</span>
+                  <span>{{ progressPct(loan) }}%</span>
+                </div>
+                <div class="lcp-bar">
+                  <div class="lcp-fill"
+                    [style.width.%]="progressPct(loan)"
+                    [style.background]="
+                      getProductColor(loan.loanType)">
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (loan.emisOverdue > 0) {
+              <div class="lc-overdue-warn">
+                ⚠ {{ loan.emisOverdue }} EMI(s) overdue
+              </div>
+            }
+
+            @if (loan.foreclosureRequested) {
+              <div class="lc-fc-tag">
+                🔒 Foreclosure Pending Admin Review
+              </div>
+            }
+          </div>
+
+          <!-- Card actions -->
+          <div class="lc-actions">
+            @if (['APPROVED','OVERDUE']
+                  .includes(loan.status)) {
+              <button class="lca-btn"
+                (click)="viewSchedule(loan)">
+                📅 EMI Schedule
+              </button>
+              @if (!loan.foreclosureRequested) {
+                <button class="lca-btn lca-fc"
+                  (click)="openForeclosure(loan)">
+                  🔒 Foreclose
+                </button>
+              }
+            }
+          </div>
+        </div>
+      }
+    </div>
+  }
+}
+
+<!-- ════════════════════════════════
+     TAB 2 — APPLY
+════════════════════════════════ -->
+@if (tab() === 'apply') {
+
+  <!-- Step indicator -->
+  <div class="step-bar">
+    @for (s of [
+      {k:'product', n:1, l:'Loan Product'},
+      {k:'details', n:2, l:'Details'},
+      {k:'docs',    n:3, l:'Documents'},
+      {k:'review',  n:4, l:'Review'},
+    ]; track s.k) {
+      <div class="step-item"
+        [class.step-active]="step() === s.k"
+        [class.step-done]="isStepDone(s.k)">
+        <div class="step-circle">{{ s.n }}</div>
+        <div class="step-label">{{ s.l }}</div>
+      </div>
+      @if (s.n < 4) {
+        <div class="step-line"></div>
+      }
+    }
+  </div>
+
+  <!-- ── STEP 1: PRODUCT ── -->
+  @if (step() === 'product') {
+    <div class="section-head">
+      <div>
+        <h1>Choose Loan Product</h1>
+        <p>Select the product that fits your financial goal</p>
+      </div>
+    </div>
+
+    @if (productsLoading()) {
+      <div class="ln-loading">
+        <div class="spin-ring"></div>
+        <p>Loading products...</p>
+      </div>
+    } @else if (products().length === 0) {
+      <div class="placeholder">
+        <div class="ph-icon">🏦</div>
+        <h3>No Products Available</h3>
+        <p>Please contact the bank for available loan products.</p>
+      </div>
+    } @else {
+      <div class="product-grid">
+        @for (p of products(); track p.id) {
+          <div class="product-card"
+            [class.pc-selected]="
+              selectedProduct()?.id === p.id"
+            [style.--pc]="getProductColor(p.loanType)"
+            (click)="selectProduct(p)">
+
+            <div class="pc-top">
+              <span class="pc-icon">
+                {{ getProductIcon(p.loanType) }}
+              </span>
+              <span class="pc-type">
+                {{ p.loanType }}
+              </span>
+            </div>
+
+            <div class="pc-name">{{ p.productName }}</div>
+
+            @if (p.description) {
+              <div class="pc-desc">{{ p.description }}</div>
+            }
+
+            <div class="pc-stats">
+              <div class="pcs">
+                <span>Rate</span>
+                <strong>{{ p.annualInterestRate }}%</strong>
+              </div>
+              <div class="pcs">
+                <span>Min</span>
+                <strong>{{ fmt(p.minAmount) }}</strong>
+              </div>
+              <div class="pcs">
+                <span>Max</span>
+                <strong>{{ fmt(p.maxAmount) }}</strong>
+              </div>
+            </div>
+
+            <div class="pc-tenures">
+              <span>Tenures: </span>
+              <strong>{{ p.allowedTenures }} months</strong>
+            </div>
+
+            <div class="pc-docs">
+              @if (p.incomeProofRequired) {
+                <span class="pd-tag">📄 Income</span>
+              }
+              @if (p.propertyDocRequired) {
+                <span class="pd-tag">🏠 Property</span>
+              }
+              @if (p.vehicleDocRequired) {
+                <span class="pd-tag">🚗 Vehicle</span>
+              }
+              @if (p.bankStatementRequired) {
+                <span class="pd-tag">🏦 Bank Stmt</span>
+              }
+            </div>
+
+            <div class="pc-select">
+              @if (selectedProduct()?.id === p.id) {
+                ✅ Selected
+              } @else {
+                Click to Select →
+              }
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+
+  <!-- ── STEP 2: DETAILS + CALCULATOR ── -->
+  @if (step() === 'details') {
+    <div class="apply-layout">
+
+      <!-- Form -->
+      <div class="apply-form-card">
+        <div class="afc-header">
+          <span>{{ getProductIcon(
+            selectedProduct()?.loanType) }}</span>
+          <div>
+            <h3>{{ selectedProduct()?.productName }}</h3>
+            <p>{{ selectedProduct()?.loanType }} Loan</p>
+          </div>
+        </div>
+
+        <!-- Amount -->
+        <div class="form-group">
+          <label>Loan Amount (₹)
+            <span class="req">*</span>
+          </label>
+          <div class="amt-wrap">
+            <span class="rupee">₹</span>
+            <input type="number" class="ln-input amt-inp"
+              [(ngModel)]="applyForm.principalAmount"
+              [placeholder]="
+                'Min ' + fmt(selectedProduct()?.minAmount)"
+              (ngModelChange)="syncCalc()" />
+          </div>
+          @if (selectedProduct()) {
+            <span class="field-hint">
+              {{ fmt(selectedProduct().minAmount) }} —
+              {{ fmt(selectedProduct().maxAmount) }}
+            </span>
+          }
+        </div>
+
+        <!-- Tenure -->
+        <div class="form-group">
+          <label>Tenure <span class="req">*</span></label>
+          <div class="tenure-chips">
+            @for (t of allowedTenures; track t) {
+              <button class="tc-chip"
+                [class.tc-active]="
+                  applyForm.tenureMonths === t"
+                (click)="applyForm.tenureMonths = t;
+                         syncCalc()">
+                {{ t }}m
+              </button>
+            }
+          </div>
+          <div class="tenure-label">
+            Selected:
+            <strong>{{ applyForm.tenureMonths }} months
+              ({{ (applyForm.tenureMonths/12)
+                   .toFixed(1) }} yrs)
+            </strong>
+          </div>
+        </div>
+
+        <!-- Account -->
+        <div class="form-group">
+          <label>EMI Deduction Account
+            <span class="req">*</span>
+          </label>
+          <select class="ln-input"
+            [(ngModel)]="applyForm.accountNumber">
+            @for (acc of accounts;
+                  track acc.accountNumber) {
+              <option [value]="acc.accountNumber">
+                {{ acc.accountType }} ·
+                {{ acc.accountNumber }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <!-- Purpose -->
+        <div class="form-group">
+          <label>Purpose / Reason</label>
+          <textarea class="ln-input" rows="3"
+            [(ngModel)]="applyForm.purpose"
+            placeholder="Briefly describe the purpose...">
+          </textarea>
+        </div>
+
+        <div class="apply-nav">
+          <button class="ln-btn-outline"
+            (click)="step.set('product')">
+            ← Back
+          </button>
+          <button class="ln-btn-primary"
+            (click)="goToDocs()">
+            Next → Documents
+          </button>
+        </div>
+      </div>
+
+      <!-- EMI Calculator -->
+      <div class="calc-card">
+        <div class="calc-title">📊 EMI Breakdown</div>
+
+        @if (calcLoading()) {
+          <div class="calc-loading">
+            <div class="spin-ring"></div>
+          </div>
+        } @else if (calcResult()) {
+          <div class="calc-emi-box">
+            <div class="emi-label">Monthly EMI</div>
+            <div class="emi-val">
+              {{ fmt(calcResult().emiAmount) }}
+            </div>
+          </div>
+
+          <div class="calc-rows">
+            <div class="cr-row">
+              <span>Principal</span>
+              <strong>
+                {{ fmt(calcResult().principal) }}
+              </strong>
+            </div>
+            <div class="cr-row">
+              <span>Total Interest</span>
+              <strong class="cr-interest">
+                {{ fmt(calcResult().totalInterest) }}
+              </strong>
+            </div>
+            <div class="cr-row cr-total">
+              <span>Total Payable</span>
+              <strong>
+                {{ fmt(calcResult().totalPayable) }}
+              </strong>
+            </div>
+          </div>
+
+          <!-- Visual bar -->
+          <div class="cr-bar">
+            <div class="crb-p"
+              [style.width.%]="principalPct()">
+            </div>
+            <div class="crb-i"
+              [style.width.%]="interestPct()">
+            </div>
+          </div>
+          <div class="cr-legend">
+            <div class="crl">
+              <span class="crl-dot crl-p"></span>
+              Principal {{ principalPct() }}%
+            </div>
+            <div class="crl">
+              <span class="crl-dot crl-i"></span>
+              Interest {{ interestPct() }}%
+            </div>
+          </div>
+
+          <p class="calc-note">
+            * At {{ selectedProduct()?.annualInterestRate
+            }}% p.a. Actual rate set on approval.
+          </p>
+        } @else {
+          <div class="calc-empty">
+            Fill in amount and tenure to see EMI breakdown.
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ── STEP 3: DOCUMENTS ── -->
+  @if (step() === 'docs') {
+    <div class="docs-card">
+      <div class="section-head">
+        <div>
+          <h1>Upload Documents</h1>
+          <p>PDF, JPG or PNG — max 5MB each</p>
+        </div>
+      </div>
+
+      @for (doc of requiredDocs; track doc.key) {
+        <div class="doc-row">
+          <div class="doc-info">
+            <span class="doc-icon">
+              {{ doc.file ? '✅' : '📄' }}
+            </span>
+            <div>
+              <div class="doc-label">
+                {{ doc.label }}
+                @if (doc.required) {
+                  <span class="req">*</span>
+                }
+              </div>
+              @if (doc.file) {
+                <div class="doc-filename">
+                  {{ doc.file.name }}
+                  ({{ (doc.file.size/1024).toFixed(0) }} KB)
+                </div>
+              } @else {
+                <div class="doc-hint">No file selected</div>
+              }
+            </div>
+          </div>
+          <label class="doc-upload-btn">
+            {{ doc.file ? 'Change' : 'Upload' }}
+            <input type="file"
+              (change)="onFileSelect($event, doc.key)"
+              accept=".pdf,.jpg,.jpeg,.png" />
+          </label>
+        </div>
+      }
+
+      <div class="apply-nav" style="margin-top:24px">
+        <button class="ln-btn-outline"
+          (click)="step.set('details')">
+          ← Back
+        </button>
+        <button class="ln-btn-primary"
+          (click)="goToReview()">
+          Next → Review
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ── STEP 4: REVIEW ── -->
+  @if (step() === 'review') {
+    <div class="review-card">
+      <div class="section-head">
+        <div>
+          <h1>Review Application</h1>
+          <p>Confirm all details before submitting</p>
+        </div>
+      </div>
+
+      <div class="review-grid">
+        <div class="rg-item">
+          <span>Loan Product</span>
+          <strong>
+            {{ selectedProduct()?.productName }}
+          </strong>
+        </div>
+        <div class="rg-item">
+          <span>Loan Type</span>
+          <strong>{{ selectedProduct()?.loanType }}</strong>
+        </div>
+        <div class="rg-item">
+          <span>Amount</span>
+          <strong>{{ fmt(applyForm.principalAmount) }}</strong>
+        </div>
+        <div class="rg-item">
+          <span>Tenure</span>
+          <strong>{{ applyForm.tenureMonths }} months</strong>
+        </div>
+        <div class="rg-item">
+          <span>EMI Account</span>
+          <strong class="mono">
+            {{ applyForm.accountNumber }}
+          </strong>
+        </div>
+        @if (calcResult()) {
+          <div class="rg-item">
+            <span>Est. Monthly EMI</span>
+            <strong class="rg-emi">
+              {{ fmt(calcResult().emiAmount) }}
+            </strong>
+          </div>
+          <div class="rg-item">
+            <span>Est. Total Interest</span>
+            <strong>
+              {{ fmt(calcResult().totalInterest) }}
+            </strong>
+          </div>
+          <div class="rg-item">
+            <span>Est. Total Payable</span>
+            <strong>
+              {{ fmt(calcResult().totalPayable) }}
+            </strong>
+          </div>
+        }
+        @if (applyForm.purpose) {
+          <div class="rg-item rg-full">
+            <span>Purpose</span>
+            <strong>{{ applyForm.purpose }}</strong>
+          </div>
+        }
+      </div>
+
+      <!-- Docs summary -->
+      <div class="review-docs">
+        <div class="rd-title">Documents</div>
+        @for (doc of requiredDocs; track doc.key) {
+          <div class="rd-row">
+            <span>{{ doc.file ? '✅' : '⬜' }}</span>
+            <span>{{ doc.label }}</span>
+            <span class="rd-file">
+              {{ doc.file?.name ?? '—' }}
+            </span>
+          </div>
+        }
+      </div>
+
+      <div class="review-note">
+        By submitting you authorise NeoBank to debit EMIs
+        from your account on the scheduled due date.
+      </div>
+
+      <div class="apply-nav">
+        <button class="ln-btn-outline"
+          (click)="step.set('docs')">
+          ← Back
+        </button>
+        <button class="ln-btn-primary"
+          (click)="submitApplication()"
+          [disabled]="applyLoading()">
+          @if (applyLoading()) {
+            <span class="spinner"></span>
+          }
+          🚀 Submit Application
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ── SUCCESS ── -->
+  @if (step() === 'success') {
+    <div class="success-card">
+      <div class="sc-emoji">🎉</div>
+      <h2>Application Submitted!</h2>
+      <p>Your loan application has been submitted.</p>
+
+      @if (appliedLoan()) {
+        <div class="sc-ref">
+          Application ID:
+          <strong>{{ appliedLoan().loanId }}</strong>
+        </div>
+        <div class="sc-meta">
+          <span>
+            {{ getProductIcon(appliedLoan().loanType) }}
+            {{ appliedLoan().loanType }}
+          </span>
+          <span>·</span>
+          <span>{{ fmt(appliedLoan().principalAmount) }}</span>
+          <span>·</span>
+          <span>{{ appliedLoan().tenureMonths }} months</span>
+        </div>
+      }
+
+      <p class="sc-note">
+        We will review within 2-3 business days
+        and notify you via email.
+      </p>
+
+      <div class="sc-actions">
+        <button class="ln-btn-outline"
+          (click)="resetApply()">
+          Apply Another
+        </button>
+        <button class="ln-btn-primary"
+          (click)="switchTab('dashboard')">
+          View My Loans
+        </button>
+      </div>
+    </div>
+  }
+}
+
+<!-- ════════════════════════════════
+     TAB 3 — EMI SCHEDULE
+════════════════════════════════ -->
+@if (tab() === 'schedule') {
+
+  @if (!selectedLoan()) {
+    <div class="placeholder">
+      <div class="ph-icon">📅</div>
+      <h3>No Loan Selected</h3>
+      <p>Go to My Loans and click EMI Schedule.</p>
+      <button class="ln-btn-primary"
+        (click)="switchTab('dashboard')">
+        ← My Loans
+      </button>
+    </div>
+  } @else {
+
+    <!-- Header -->
+    <div class="section-head">
+      <div>
+        <h1>EMI Schedule</h1>
+        <p>
+          {{ selectedLoan().loanId }} ·
+          {{ selectedLoan().loanType }} ·
+          {{ selectedLoan().interestRate }}% p.a.
+        </p>
+      </div>
+      <button class="ln-btn-outline"
+        (click)="switchTab('dashboard')">
+        ← Back
+      </button>
+    </div>
+
+    <!-- Schedule stats -->
+    <div class="stats-grid" style="margin-bottom:20px">
+      <div class="stat-card">
+        <div class="stat-icon">💰</div>
+        <div>
+          <div class="stat-val">
+            {{ fmt(selectedLoan().emiAmount) }}
+          </div>
+          <div class="stat-lbl">Monthly EMI</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">✅</div>
+        <div>
+          <div class="stat-val">
+            {{ selectedLoan().emisPaid }}
+          </div>
+          <div class="stat-lbl">EMIs Paid</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏳</div>
+        <div>
+          <div class="stat-val">
+            {{ selectedLoan().totalEmis -
+               selectedLoan().emisPaid }}
+          </div>
+          <div class="stat-lbl">Remaining</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🏦</div>
+        <div>
+          <div class="stat-val">
+            {{ fmt(selectedLoan().outstandingBalance) }}
+          </div>
+          <div class="stat-lbl">Outstanding</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Table -->
+    @if (scheduleLoading()) {
+      <div class="ln-loading">
+        <div class="spin-ring"></div>
+        <p>Loading schedule...</p>
+      </div>
+    } @else {
+      <div class="sch-table-wrap">
+        <table class="sch-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Due Date</th>
+              <th>EMI</th>
+              <th>Principal</th>
+              <th>Interest</th>
+              <th>Outstanding</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (emi of emiSchedule(); track emi.id) {
+              <tr
+                [class.tr-paid]="emi.status==='PAID'"
+                [class.tr-overdue]="emi.status==='OVERDUE'"
+                [class.tr-next]="
+                  emi.dueDate ===
+                  selectedLoan().nextEmiDate &&
+                  emi.status === 'PENDING'">
+                <td class="emi-num">{{ emi.emiNumber }}</td>
+                <td>{{ emi.dueDate }}</td>
+                <td>
+                  <strong>{{ fmt(emi.emiAmount) }}</strong>
+                </td>
+                <td>{{ fmt(emi.principalComponent) }}</td>
+                <td class="int-col">
+                  {{ fmt(emi.interestComponent) }}
+                </td>
+                <td>{{ fmt(emi.outstandingAfter) }}</td>
+                <td>
+                  <span class="emi-badge"
+                    [class]="getEmiClass(emi.status)">
+                    {{ emi.status }}
+                  </span>
+                </td>
+                <td>
+                  @if (['PENDING','OVERDUE']
+                       .includes(emi.status)) {
+                    <button class="pay-btn"
+                      [disabled]="payingEmiId()===emi.id"
+                      (click)="payEmi(
+                        selectedLoan(), emi)">
+                      @if (payingEmiId() === emi.id) {
+                        <span class="spinner-sm"></span>
+                      } @else {
+                        💳 Pay
+                      }
+                    </button>
+                  }
+                  @if (emi.status === 'PAID') {
+                    <span class="paid-tag">✅ Paid</span>
+                  }
+                  @if (emi.status === 'WAIVED') {
+                    <span class="waived-tag">Waived</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  }
+}
+
+<!-- ════════════════════════════════
+     TAB 4 — HISTORY
+════════════════════════════════ -->
+@if (tab() === 'history') {
+  <div class="section-head">
+    <h1>Loan History</h1>
+    <p>All your loan applications</p>
+  </div>
+
+  <!-- Filter -->
+  <div class="hist-filters">
+    @for (f of ['ALL','PENDING','APPROVED',
+                'REJECTED','CLOSED','OVERDUE',
+                'FORECLOSED']; track f) {
+      <button class="hf-btn"
+        [class.hf-active]="historyFilter === f"
+        (click)="historyFilter = f">
+        {{ f }}
+      </button>
+    }
+  </div>
+
+  @if (filteredHistory.length === 0) {
+    <div class="placeholder">
+      <div class="ph-icon">📋</div>
+      <h3>No Loans Found</h3>
+    </div>
+  } @else {
+    <div class="hist-list">
+      @for (loan of filteredHistory; track loan.loanId) {
+        <div class="hist-item">
+          <div class="hi-icon">
+            {{ getProductIcon(loan.loanType) }}
+          </div>
+          <div class="hi-body">
+            <div class="hi-top">
+              <span class="hi-name">
+                {{ loan.productName ?? loan.loanType }}
+                Loan
+              </span>
+              <span class="st-badge"
+                [class]="getStatusClass(loan.status)">
+                {{ loan.status }}
+              </span>
+            </div>
+            <div class="hi-id">{{ loan.loanId }}</div>
+            <div class="hi-detail">
+              {{ fmt(loan.principalAmount) }} ·
+              {{ loan.tenureMonths }} months
+              @if (loan.disbursementDate) {
+                · Disbursed {{ loan.disbursementDate }}
+              }
+            </div>
+          </div>
+          @if (['APPROVED','OVERDUE']
+               .includes(loan.status)) {
+            <button class="hi-btn"
+              (click)="viewSchedule(loan)">
+              📅 Schedule
+            </button>
+          }
+        </div>
+      }
+    </div>
+  }
+}
+
+<!-- ══ FORECLOSURE CONFIRM MODAL ══ -->
+@if (showFcConfirm() && fcLoan()) {
+  <div class="modal-overlay"
+    (click)="showFcConfirm.set(false)"></div>
+  <div class="modal-wrap">
+    <div class="modal-box">
+      <div class="mb-header">
+        <h3>🔒 Request Foreclosure</h3>
+        <button class="mb-close"
+          (click)="showFcConfirm.set(false)">✕</button>
+      </div>
+      <div class="mb-body">
+        <div class="fc-loan-info">
+          <div class="fc-row">
+            <span>Loan ID</span>
+            <strong>{{ fcLoan().loanId }}</strong>
+          </div>
+          <div class="fc-row">
+            <span>Outstanding Balance</span>
+            <strong>
+              {{ fmt(fcLoan().outstandingBalance) }}
+            </strong>
+          </div>
+          <div class="fc-row fc-charge">
+            <span>Foreclosure Charge (2%)</span>
+            <strong class="fc-red">
+              {{ fmt(
+                (parseFloat(fcLoan().outstandingBalance)
+                 * 0.02).toFixed(2)) }}
+            </strong>
+          </div>
+          <div class="fc-row fc-total">
+            <span>Total to Pay</span>
+            <strong>
+              {{ fmt(fcLoan().foreclosureAmount ??
+                (parseFloat(fcLoan().outstandingBalance)
+                 * 1.02).toFixed(2)) }}
+            </strong>
+          </div>
+        </div>
+
+        <div class="fc-note">
+          ⚠ This request will be sent to the admin
+          for approval. Once approved, the foreclosure
+          amount will be deducted from your account
+          and the loan will be closed.
+        </div>
+      </div>
+      <div class="mb-footer">
+        <button class="ln-btn-outline"
+          (click)="showFcConfirm.set(false)">
+          Cancel
+        </button>
+        <button class="ln-btn-danger"
+          (click)="confirmForeclosure()"
+          [disabled]="fcLoading()">
+          @if (fcLoading()) {
+            <span class="spinner"></span>
+          }
+          🔒 Confirm Foreclosure Request
+        </button>
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,288 @@
+<!------- admin-loan-product.component.html ------->
+
+<!-- Alerts -->
+@if (error()) {
+  <div class="page-alert err">
+    <span>{{ error() }}</span>
+    <button (click)="error.set('')">✕</button>
+  </div>
+}
+@if (success()) {
+  <div class="page-alert ok">
+    <span>{{ success() }}</span>
+    <button (click)="success.set('')">✕</button>
+  </div>
+}
+
+<div class="section-head">
+  <div>
+    <h1>🏦 Loan Products</h1>
+    <p>Configure loan products available to customers</p>
+  </div>
+  <button class="lp-btn-primary" (click)="openCreate()">
+    + New Product
+  </button>
+</div>
+
+@if (loading()) {
+  <div class="lp-loading">
+    <div class="spin-ring"></div>
+    <p>Loading products...</p>
+  </div>
+} @else if (products().length === 0) {
+  <div class="placeholder">
+    <div >
+    <h3>No Loan Products</h3>
+    <p>Create loan products for customers to apply.</p>
+    </div>
+    <button class="lp-btn-primary" (click)="openCreate()">
+      + Create First Product
+    </button>
+  </div>
+} @else {
+  <div class="products-grid">
+    @for (prod of products(); track prod.id) {
+      <div class="prod-card"
+        [class.prod-inactive]="!prod.isActive">
+
+        <div class="prod-header">
+          <div class="prod-icon">
+            {{ getLoanTypeIcon(prod.loanType) }}
+          </div>
+          <div class="prod-title-wrap">
+            <div class="prod-name">{{ prod.productName }}</div>
+            <div class="prod-type">{{ prod.loanType }}</div>
+          </div>
+          <span class="prod-status"
+            [class]="prod.isActive ? 'ps-active' : 'ps-inactive'">
+            {{ prod.isActive ? 'Active' : 'Inactive' }}
+          </span>
+        </div>
+
+        @if (prod.description) {
+          <div class="prod-desc">{{ prod.description }}</div>
+        }
+
+        <div class="prod-stats">
+          <div class="ps-item">
+            <span>Rate</span>
+            <strong>{{ prod.annualInterestRate }}% p.a.</strong>
+          </div>
+          <div class="ps-item">
+            <span>Min</span>
+            <strong>{{ formatAmount(prod.minAmount) }}</strong>
+          </div>
+          <div class="ps-item">
+            <span>Max</span>
+            <strong>{{ formatAmount(prod.maxAmount) }}</strong>
+          </div>
+        </div>
+
+        <div class="prod-tenures">
+          <span class="pt-label">Tenures:</span>
+          @for (t of prod.allowedTenures.split(','); track t) {
+            <span class="pt-chip">{{ t.trim() }}m</span>
+          }
+        </div>
+
+        <div class="prod-docs">
+          <span class="pd-label">Required Docs:</span>
+          @if (prod.incomeProofRequired) {
+            <span class="pd-doc">📄 Income</span>
+          }
+          @if (prod.addressProofRequired) {
+            <span class="pd-doc">🏠 Address</span>
+          }
+          @if (prod.propertyDocRequired) {
+            <span class="pd-doc">📋 Property</span>
+          }
+          @if (prod.vehicleDocRequired) {
+            <span class="pd-doc">🚗 Vehicle</span>
+          }
+          @if (prod.bankStatementRequired) {
+            <span class="pd-doc">🏦 Bank Stmt</span>
+          }
+        </div>
+
+        <div class="prod-meta">
+          Created by {{ prod.createdBy }} ·
+          {{ prod.createdAt?.split(',')[0] }}
+        </div>
+
+        <div class="prod-actions">
+          <button class="pa-btn" (click)="openEdit(prod)">
+            ✏️ Edit
+          </button>
+          <button class="pa-btn"
+            [class.pa-deact]="prod.isActive"
+            [class.pa-act]="!prod.isActive"
+            (click)="toggleActive(prod)">
+            {{ prod.isActive ? '⏸ Deactivate' : '▶ Activate' }}
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+}
+
+<!-- ══ MODAL ══ -->
+@if (modal() !== 'none') {
+  <div class="lp-overlay" (click)="modal.set('none')"></div>
+  <div class="lp-modal-wrap">
+    <div class="lp-modal">
+
+      <div class="lm-header">
+        <h3>
+          {{ modal() === 'create'
+             ? '+ Create Loan Product'
+             : '✏️ Edit — ' + selectedProd()?.productName }}
+        </h3>
+        <button class="lm-close" (click)="modal.set('none')">✕</button>
+      </div>
+
+      <div class="lm-body">
+        @if (formError()) {
+          <div class="lp-err-box">{{ formError() }}</div>
+        }
+
+        <div class="form-group">
+          <label>Product Name <span class="req">*</span></label>
+          <input type="text" class="lp-input" [(ngModel)]="f.productName"
+            placeholder="e.g. NeoBank Personal Loan" />
+        </div>
+
+        <div class="form-group">
+          <label>Description</label>
+          <textarea class="lp-input" rows="2"
+            [(ngModel)]="f.description"
+            placeholder="Brief description for customers..."></textarea>
+        </div>
+
+        @if (modal() === 'create') {
+          <div class="form-group">
+            <label>Loan Type <span class="req">*</span></label>
+            <div class="type-radio-group">
+              @for (lt of loanTypes; track lt.value) {
+                <label class="type-radio">
+                  <input type="radio"
+                    [(ngModel)]="f.loanType"
+                    [value]="lt.value" />
+                  {{ lt.label }}
+                </label>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Min Amount (₹) <span class="req">*</span></label>
+            <div class="amt-wrap">
+              <span class="rupee">₹</span>
+              <input type="number" class="lp-input amt-inp"
+                [(ngModel)]="f.minAmount"
+                placeholder="10000" min="1" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Max Amount (₹) <span class="req">*</span></label>
+            <div class="amt-wrap">
+              <span class="rupee">₹</span>
+              <input type="number" class="lp-input amt-inp"
+                [(ngModel)]="f.maxAmount"
+                placeholder="5000000" />
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Annual Interest Rate (%) <span class="req">*</span></label>
+          <input type="number" class="lp-input"
+            [(ngModel)]="f.annualInterestRate"
+            placeholder="e.g. 10.5"
+            step="0.1" min="0.1" max="50" />
+          <span class="field-hint">
+            Typical: Personal 11–14% · Home 8–10% ·
+            Vehicle 9–12% · Education 9–11%
+          </span>
+        </div>
+
+        <div class="form-group">
+          <label>Allowed Tenures (months, comma-separated)
+            <span class="req">*</span>
+          </label>
+          <input type="text" class="lp-input"
+            [(ngModel)]="f.allowedTenures"
+            placeholder="12,24,36,48,60" />
+          <div class="tenure-presets">
+            <span class="tp-label">Presets:</span>
+            @for (preset of tenurePresets; track preset.label) {
+              <button class="tp-btn"
+                (click)="f.allowedTenures = preset.value">
+                {{ preset.label }}
+              </button>
+            }
+          </div>
+          <span class="field-hint">
+            Customers can only choose from these tenures
+          </span>
+        </div>
+
+        <!-- Required Documents -->
+        <div class="form-group">
+          <label>Required Documents</label>
+          <div class="docs-checkboxes">
+            <label class="doc-chk">
+              <input type="checkbox"
+                [(ngModel)]="f.incomeProofRequired" />
+              📄 Income Proof (Salary / ITR)
+            </label>
+            <label class="doc-chk">
+              <input type="checkbox"
+                [(ngModel)]="f.addressProofRequired" />
+              🏠 Address Proof
+            </label>
+            <label class="doc-chk">
+              <input type="checkbox"
+                [(ngModel)]="f.propertyDocRequired" />
+              📋 Property Documents
+            </label>
+            <label class="doc-chk">
+              <input type="checkbox"
+                [(ngModel)]="f.vehicleDocRequired" />
+              🚗 Vehicle Documents
+            </label>
+            <label class="doc-chk">
+              <input type="checkbox"
+                [(ngModel)]="f.bankStatementRequired" />
+              🏦 Bank Statement
+            </label>
+          </div>
+        </div>
+
+        @if (modal() === 'edit') {
+          <div class="form-group">
+            <label class="doc-chk">
+              <input type="checkbox" [(ngModel)]="f.isActive" />
+              Product is Active (visible to customers)
+            </label>
+          </div>
+        }
+      </div>
+
+      <div class="lm-footer">
+        <button class="lp-btn-outline"
+          (click)="modal.set('none')">Cancel</button>
+        <button class="lp-btn-primary"
+          (click)="modal() === 'create'
+                   ? createProduct()
+                   : updateProduct()"
+          [disabled]="modalLoading()">
+          @if (modalLoading()) { <span class="spinner"></span> }
+          {{ modal() === 'create' ? 'Create Product' : 'Save Changes' }}
+        </button>
+      </div>
+
+    </div>
+  </div>
+}

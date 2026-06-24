@@ -1,0 +1,43 @@
+<div class="customer-dashboard">
+
+  <div class="dashboard-header">
+    <h2>Customer Dashboard</h2>
+    <p>Accounts and recent transactions</p>
+  </div>
+
+  <div class="balance-card">
+    <span>Total Balance</span>
+    <strong>{{ formatAmount(totalBalance) }}</strong>
+  </div>
+
+  <div class="section-card">
+    <h3>Your Accounts</h3>
+
+    <div *ngIf="accounts.length === 0" class="empty">
+      No accounts found.
+    </div>
+
+    <div class="account-list" *ngIf="accounts.length > 0">
+      <div class="account-row" *ngFor="let account of accounts">
+        <span>{{ account.accountNumber }}</span>
+        <strong>{{ formatAmount(account.balance) }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-card">
+    <h3>Recent Transactions</h3>
+
+    <div *ngIf="transactions.length === 0" class="empty">
+      No recent transactions.
+    </div>
+
+    <div class="transaction-list" *ngIf="transactions.length > 0">
+      <div class="transaction-row" *ngFor="let tx of transactions">
+        <span>{{ tx.description || tx.transactionType }}</span>
+        <strong>{{ formatAmount(tx.amount) }}</strong>
+      </div>
+    </div>
+  </div>
+
+</div>

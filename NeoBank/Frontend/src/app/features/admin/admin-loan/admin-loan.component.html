@@ -1,0 +1,469 @@
+<!------- admin-loan.component.html ------->
+
+<div class="section-head">
+  <div>
+    <h1>🏦 Loan Management</h1>
+    <!-- <p>Review, approve and track all loan applications</p> -->
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" style="margin-bottom:20px">
+  <div class="stat-card">
+    <div class="stat-icon">📋</div>
+    <div><div class="stat-val">{{ totalElements() }}</div><div class="stat-lbl">{{ activeTab() | titlecase }} Loans</div></div>
+  </div>
+</div>
+
+<!-- Tabs -->
+<!-- <div class="al-tabs">
+  @for (tab of ['all','pending','approved','rejected']; track tab) {
+    <button class="al-tab" [class.al-tab-active]="activeTab() === tab"
+      (click)="switchTab(tab)">
+      {{ tab === 'all' ? '📋 All' :
+         tab === 'pending' ? '⏳ Pending' :
+         tab === 'approved' ? '✅ Approved' : '❌ Rejected' }}
+    </button>
+  }
+</div> -->
+
+<div class="al-tabs">
+  @for (tab of tabs; track tab) {
+    <button
+      class="al-tab"
+      [class.al-tab-active]="activeTab() === tab"
+      (click)="switchTab(tab)"
+    >
+      {{ tab === 'all' ? '📋 All' :
+         tab === 'pending' ? '⏳ Pending' :
+         tab === 'approved' ? '✅ Approved' : '❌ Rejected' }}
+    </button>
+  }
+</div>
+
+<!-- Search -->
+<div class="al-toolbar">
+  <input type="text" class="al-search" [(ngModel)]="searchQuery"
+    placeholder="Search by Loan ID, Name, Email, Type..." />
+  <button class="al-refresh" (click)="loadLoans()" [disabled]="loading()">↺</button>
+</div>
+
+<!-- Loading -->
+@if (loading()) {
+  <div class="loan-loading"><div class="spin-ring"></div><p>Loading...</p></div>
+}
+
+<!-- Table -->
+@else if (filteredLoans.length === 0) {
+  <div class="placeholder">
+    <div >
+    <h3>No Loans Found</h3>
+    <p>No {{ activeTab() }} loans match your search.</p>
+    </div>
+  </div>
+} @else {
+  <div class="al-table-wrap">
+    <table class="al-table">
+      <thead>
+        <tr>
+          <th>Loan ID</th>
+          <th>Customer</th>
+          <th>Type</th>
+          <th>Amount</th>
+          <th>Tenure</th>
+          <th>EMI</th>
+          <th>Status</th>
+          <th>Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (loan of filteredLoans; track loan.loanId) {
+          <tr [class.tr-overdue]="loan.status === 'OVERDUE'">
+            <td class="mono">{{ loan.loanId }}</td>
+            <td>
+              <div class="cust-cell">
+                <div class="cust-avatar">
+                  {{ (loan.user?.fullName || loan.user?.username || 'U')[0].toUpperCase() }}
+                </div>
+                <div>
+                  <div class="cust-name">{{ loan.user?.fullName || loan.user?.username }}</div>
+                  <div class="cust-email">{{ loan.user?.email }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <span class="type-pill">
+                {{ getLoanTypeIcon(loan.loanType) }} {{ loan.loanType }}
+              </span>
+            </td>
+            <td><strong>{{ formatAmount(loan.principalAmount) }}</strong></td>
+            <td>{{ loan.tenureMonths }}m</td>
+            <td>{{ loan.emiAmount ? formatAmount(loan.emiAmount) : '—' }}</td>
+            <td>
+              <span class="st-badge" [class]="getStatusClass(loan.status)">
+                {{ loan.status }}
+              </span>
+              @if (loan.foreclosureRequested && loan.status !== 'FORECLOSED') {
+                <div class="fc-flag">Foreclosure Pending</div>
+              }
+            </td>
+            <td class="date-cell">{{ loan.createdAt?.split(',')[0] }}</td>
+            <td>
+              <button class="tbl-btn" (click)="openDetail(loan)">👁 View</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  @if (totalPages() > 1) {
+    <div class="pagination">
+      <button class="pg-btn" (click)="goToPage(0)" [disabled]="page() === 0">«</button>
+      <button class="pg-btn" (click)="goToPage(page()-1)" [disabled]="page() === 0">← Prev</button>
+      @for (p of pageNumbers; track p) {
+        <button class="pg-btn pg-num" [class.pg-active]="p === page()" (click)="goToPage(p)">{{ p+1 }}</button>
+      }
+      <button class="pg-btn" (click)="goToPage(page()+1)" [disabled]="page() >= totalPages()-1">Next →</button>
+      <button class="pg-btn" (click)="goToPage(totalPages()-1)" [disabled]="page() >= totalPages()-1">»</button>
+    </div>
+  }
+  <div class="pg-summary">Showing {{ filteredLoans.length }} of {{ totalElements() }} loans · Page {{ page()+1 }} of {{ totalPages() }}</div>
+}
+
+<!-- ══ DETAIL MODAL ══ -->
+@if (modalMode() !== 'none' && selectedLoan()) {
+  <div class="modal-overlay" (click)="closeModal()"></div>
+  <div class="modal-wrap">
+    <div class="modal-box">
+
+      <!-- Header -->
+      <div class="mb-header">
+        <div class="mb-title">
+          <span>{{ getLoanTypeIcon(selectedLoan().loanType) }}</span>
+          <div>
+            <h3>{{ selectedLoan().loanId }}</h3>
+            <p>{{ selectedLoan().loanType }} Loan · {{ selectedLoan().user?.fullName }}</p>
+          </div>
+        </div>
+        <div class="mb-head-right">
+          <span class="st-badge" [class]="getStatusClass(selectedLoan().status)">
+            {{ selectedLoan().status }}
+          </span>
+          <button class="mb-close" (click)="closeModal()">✕</button>
+        </div>
+      </div>
+
+      <div class="mb-body">
+
+        <!-- ── VIEW MODE ── -->
+        @if (modalMode() === 'detail') {
+          <div class="detail-tabs">
+
+            <!-- Loan Info -->
+            <div class="detail-grid">
+              <div class="dg-item"><span>Principal</span><strong>{{ formatAmount(selectedLoan().principalAmount) }}</strong></div>
+              <div class="dg-item"><span>Tenure</span><strong>{{ selectedLoan().tenureMonths }} months</strong></div>
+              @if (selectedLoan().interestRate) {
+                <div class="dg-item"><span>Interest Rate</span><strong>{{ selectedLoan().interestRate }}% p.a.</strong></div>
+              }
+              @if (selectedLoan().emiAmount) {
+                <div class="dg-item"><span>Monthly EMI</span><strong>{{ formatAmount(selectedLoan().emiAmount) }}</strong></div>
+              }
+              @if (selectedLoan().totalPayable) {
+                <div class="dg-item"><span>Total Payable</span><strong>{{ formatAmount(selectedLoan().totalPayable) }}</strong></div>
+              }
+              @if (selectedLoan().totalInterest) {
+                <div class="dg-item"><span>Total Interest</span><strong>{{ formatAmount(selectedLoan().totalInterest) }}</strong></div>
+              }
+              @if (selectedLoan().outstandingBalance) {
+                <div class="dg-item"><span>Outstanding</span><strong>{{ formatAmount(selectedLoan().outstandingBalance) }}</strong></div>
+              }
+              <div class="dg-item"><span>EMI Account</span><strong class="mono">{{ selectedLoan().accountNumber }}</strong></div>
+              @if (selectedLoan().nextEmiDate) {
+                <div class="dg-item"><span>Next EMI Date</span><strong>{{ selectedLoan().nextEmiDate }}</strong></div>
+              }
+              @if (selectedLoan().maturityDate) {
+                <div class="dg-item"><span>Maturity Date</span><strong>{{ selectedLoan().maturityDate }}</strong></div>
+              }
+              @if (selectedLoan().emisPaid !== undefined) {
+                <div class="dg-item"><span>EMIs Paid</span><strong>{{ selectedLoan().emisPaid }} / {{ selectedLoan().totalEmis }}</strong></div>
+              }
+              @if (selectedLoan().emisOverdue > 0) {
+                <div class="dg-item"><span>EMIs Overdue</span><strong class="err-text">{{ selectedLoan().emisOverdue }}</strong></div>
+              }
+              @if (selectedLoan().purpose) {
+                <div class="dg-item dg-full"><span>Purpose</span><strong>{{ selectedLoan().purpose }}</strong></div>
+              }
+              @if (selectedLoan().rejectionReason) {
+                <div class="dg-item dg-full"><span>Rejection Reason</span><strong class="err-text">{{ selectedLoan().rejectionReason }}</strong></div>
+              }
+              @if (selectedLoan().foreclosureRequested) {
+                <div class="dg-item dg-full">
+                  <span>Foreclosure Amount</span>
+                  <strong>{{ formatAmount(selectedLoan().foreclosureAmount) }}</strong>
+                </div>
+              }
+            </div>
+
+            <!-- Documents -->
+            <div class="doc-section">
+              <div class="ds-title">Documents</div>
+              <div class="doc-grid">
+                @if (selectedLoan().incomeProofBase64) {
+                  <div class="doc-item">
+                    <span>📄 Income Proof</span>
+                    <button class="doc-view-btn"
+                      (click)="openDoc(selectedLoan().incomeProofBase64, selectedLoan().incomeProofType)">
+                      View
+                    </button>
+                  </div>
+                }
+                @if (selectedLoan().addressProofBase64) {
+                  <div class="doc-item">
+                    <span>📄 Address Proof</span>
+                    <button class="doc-view-btn"
+                      (click)="openDoc(selectedLoan().addressProofBase64, selectedLoan().addressProofType)">
+                      View
+                    </button>
+                  </div>
+                }
+                @if (selectedLoan().propertyDocBase64) {
+                  <div class="doc-item">
+                    <span>📄 Property Doc</span>
+                    <button class="doc-view-btn"
+                      (click)="openDoc(selectedLoan().propertyDocBase64, selectedLoan().propertyDocType)">
+                      View
+                    </button>
+                  </div>
+                }
+                @if (selectedLoan().vehicleDocBase64) {
+                  <div class="doc-item">
+                    <span>📄 Vehicle Doc</span>
+                    <button class="doc-view-btn"
+                      (click)="openDoc(selectedLoan().vehicleDocBase64, selectedLoan().vehicleDocType)">
+                      View
+                    </button>
+                  </div>
+                }
+                @if (selectedLoan().bankStatementBase64) {
+                  <div class="doc-item">
+                    <span>📄 Bank Statement</span>
+                    <button class="doc-view-btn"
+                      (click)="openDoc(selectedLoan().bankStatementBase64, selectedLoan().bankStatementType)">
+                      View
+                    </button>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- EMI Schedule -->
+            @if (emiSchedule().length > 0) {
+              <div class="emi-section">
+                <div class="ds-title">EMI Schedule</div>
+                @if (scheduleLoading()) {
+                  <div class="loan-loading"><div class="spin-ring"></div></div>
+                } @else {
+                  <div class="mini-schedule-wrap">
+                    <table class="mini-schedule">
+                      <thead>
+                        <tr>
+                          <th>#</th><th>Due Date</th><th>EMI</th>
+                          <th>Principal</th><th>Interest</th><th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (emi of emiSchedule(); track emi.id) {
+                          <tr>
+                            <td>{{ emi.emiNumber }}</td>
+                            <td>{{ emi.dueDate }}</td>
+                            <td><strong>{{ formatAmount(emi.emiAmount) }}</strong></td>
+                            <td>{{ formatAmount(emi.principalComponent) }}</td>
+                            <td>{{ formatAmount(emi.interestComponent) }}</td>
+                            <td><span class="emi-badge" [class]="getEmiStatusClass(emi.status)">{{ emi.status }}</span></td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                }
+              </div>
+            }
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="mb-footer">
+            <button class="ln-btn-outline" (click)="closeModal()">Close</button>
+            @if (selectedLoan().status === 'PENDING') {
+              <button class="ln-btn-reject" (click)="openReject()">❌ Reject</button>
+              <button class="ln-btn-approve" (click)="openApprove()">✅ Approve</button>
+            }
+            @if (selectedLoan().foreclosureRequested &&
+                 !['CLOSED','FORECLOSED'].includes(selectedLoan().status)) {
+              <button class="ln-btn-warn" (click)="approveForeclosure()">🔒 Approve Foreclosure</button>
+            }
+          </div>
+        }
+
+        <!-- ── APPROVE MODE ── -->
+        <!-- @if (modalMode() === 'approve') {
+          <div class="action-form">
+            <h4>✅ Approve Loan — {{ selectedLoan().loanId }}</h4>
+            <p>Set the annual interest rate for this loan. An EMI schedule will be generated automatically.</p>
+
+            <div class="form-group">
+              <label>Annual Interest Rate (%) <span class="req">*</span></label>
+              <input type="number" class="ln-input"
+                [(ngModel)]="approveRate"
+                placeholder="e.g. 10.5"
+                step="0.1" min="0.1" max="50" />
+              <span class="field-hint">Typical rates: Home 8–10%, Personal 11–14%, Vehicle 9–12%, Education 9–11%</span>
+            </div>
+
+            @if (approveRate) {
+              <div class="emi-preview">
+                <div class="ep-label">Estimated EMI</div>
+                <div class="ep-amount">
+                  Based on ₹{{ formatAmount(selectedLoan().principalAmount) }}
+                  @ {{ approveRate }}% for {{ selectedLoan().tenureMonths }} months
+                </div>
+              </div>
+            }
+
+            @if (approveError()) { <div class="err-box">{{ approveError() }}</div> }
+
+            <div class="mb-footer">
+              <button class="ln-btn-outline" (click)="modalMode.set('detail')">← Back</button>
+              <button class="ln-btn-approve" (click)="confirmApprove()" [disabled]="modalLoading()">
+                @if (modalLoading()) { <span class="spinner"></span> }
+                ✅ Confirm Approval
+              </button>
+            </div>
+          </div>
+        } -->
+
+
+        <!-- Replace the ── APPROVE MODE ── section -->
+
+@if (modalMode() === 'approve') {
+  <div class="action-form">
+    <h4>✅ Approve Loan — {{ selectedLoan().loanId }}</h4>
+    <p>Set the interest rate and select a treasury to disburse ₹{{ formatAmount(selectedLoan().principalAmount) }} to the customer.</p>
+
+    <!-- Treasury Selector -->
+    <div class="form-group">
+      <label>Select Treasury <span class="req">*</span></label>
+      @if (treasuries().length === 0) {
+        <div class="t-warn-box">
+          ⚠ No active treasuries found.
+          Please create and fund a treasury first.
+        </div>
+      } @else {
+        <div class="treasury-selector">
+          @for (t of treasuries(); track t.id) {
+            <div class="ts-option"
+              [class.ts-selected]="selectedTrId === t.id"
+              (click)="selectedTrId = t.id">
+              <div class="tso-left">
+                <div class="tso-name">{{ t.name }}</div>
+                <div class="tso-code">{{ t.treasuryCode }}</div>
+              </div>
+              <div class="tso-right">
+                <div class="tso-balance">{{ formatAmount(t.balance) }}</div>
+                <div class="tso-label">Available</div>
+                @if (parseFloat(t.balance) < parseFloat(selectedLoan().principalAmount)) {
+                  <div class="tso-warn">⚠ Insufficient</div>
+                } @else {
+                  <div class="tso-ok">✓ Sufficient</div>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+
+    <!-- Interest Rate -->
+    <div class="form-group">
+      <label>Annual Interest Rate (%) <span class="req">*</span></label>
+      <input type="number" class="ln-input"
+        [(ngModel)]="approveRate"
+        placeholder="e.g. 10.5"
+        step="0.1" min="0.1" max="50" />
+      <span class="field-hint">
+        Typical: Home 8–10% · Personal 11–14% · Vehicle 9–12% · Education 9–11%
+      </span>
+    </div>
+
+    <!-- Preview -->
+    @if (selectedTrId && approveRate) {
+      <div class="approve-preview">
+        <div class="ap-row">
+          <span>Loan Amount (disbursed from treasury)</span>
+          <strong class="ap-out">{{ formatAmount(selectedLoan().principalAmount) }}</strong>
+        </div>
+        <div class="ap-row">
+          <span>Interest Rate</span>
+          <strong>{{ approveRate }}% p.a.</strong>
+        </div>
+        <div class="ap-row">
+          <span>Tenure</span>
+          <strong>{{ selectedLoan().tenureMonths }} months</strong>
+        </div>
+        <div class="ap-row">
+          <span>Treasury</span>
+          <strong>{{ treasuries().find(t => t.id === selectedTrId)?.name }}</strong>
+        </div>
+        <div class="ap-divider"></div>
+        <div class="ap-row ap-note">
+          ℹ️ EMIs will be credited back to this treasury
+          (Principal + Interest) on each due date.
+        </div>
+      </div>
+    }
+
+    @if (approveError()) { <div class="err-box">{{ approveError() }}</div> }
+
+    <div class="mb-footer">
+      <button class="ln-btn-outline" (click)="modalMode.set('detail')">← Back</button>
+      <button class="ln-btn-approve" (click)="confirmApprove()"
+        [disabled]="modalLoading() || treasuries().length === 0">
+        @if (modalLoading()) { <span class="spinner"></span> }
+        ✅ Approve & Disburse
+      </button>
+    </div>
+  </div>
+}
+
+        <!-- ── REJECT MODE ── -->
+        @if (modalMode() === 'reject') {
+          <div class="action-form">
+            <h4>❌ Reject Loan — {{ selectedLoan().loanId }}</h4>
+            <p>Provide a clear reason for rejection. This will be communicated to the customer via email.</p>
+
+            <div class="form-group">
+              <label>Rejection Reason <span class="req">*</span></label>
+              <textarea class="ln-input" rows="4"
+                [(ngModel)]="rejectReason"
+                placeholder="e.g. Insufficient income, low credit score, incomplete documents...">
+              </textarea>
+            </div>
+
+            @if (rejectError()) { <div class="err-box">{{ rejectError() }}</div> }
+
+            <div class="mb-footer">
+              <button class="ln-btn-outline" (click)="modalMode.set('detail')">← Back</button>
+              <button class="ln-btn-reject" (click)="confirmReject()" [disabled]="modalLoading()">
+                @if (modalLoading()) { <span class="spinner"></span> }
+                ❌ Confirm Rejection
+              </button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+}

@@ -1,0 +1,362 @@
+<!------- customer-profile.component.html ------->
+
+<!-- Global alerts -->
+<!-- @if (error())   { <div class="p-alert p-err">{{ error() }}<button (click)="error.set('')">✕</button></div> }
+@if (success()) { <div class="p-alert p-ok">{{ success() }}<button (click)="success.set('')">✕</button></div> } -->
+
+<!-- Loading -->
+@if (loading()) {
+  <div class="p-loading"><div class="spin-ring"></div><p>Loading profile...</p></div>
+}
+
+@if (!loading() && profile()) {
+
+  <!-- ══ PROFILE HEADER CARD ══ -->
+  <div class="profile-hero">
+    <!-- Avatar -->
+    <div class="avatar-wrap">
+      @if (photoPreview()) {
+        <img [src]="photoPreview()!" class="avatar-img" alt="Profile" />
+      } @else {
+        <div class="avatar-initials">{{ getInitials() }}</div>
+      }
+      <button class="avatar-edit-btn"
+        (click)="switchTab('photo')"
+        title="Change photo">✏</button>
+    </div>
+
+    <!-- Name + info -->
+    <div class="hero-info">
+      <h2 class="hero-name">{{ profile().fullName || profile().username }}</h2>
+      <p class="hero-email">{{ profile().email }}</p>
+      <div class="hero-badges">
+        <span class="role-badge">{{ profile().role }}</span>
+        <span class="status-badge"
+          [class]="'sb-' + profile().status?.toLowerCase()">
+          {{ profile().status }}
+        </span>
+      </div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="hero-actions">
+      <button class="ha-btn" (click)="switchTab('edit')">✏ Edit Profile</button>
+      <button class="ha-btn ha-email" (click)="switchTab('email')">📧 Change Email</button>
+      <button class="ha-btn ha-pw" (click)="switchTab('password')">🔒 Change Password</button>
+    </div>
+  </div>
+
+  <!-- ══ TABS ══ -->
+  <div class="profile-tabs">
+    <button class="ptab" [class.ptab-active]="activeTab() === 'view'"
+      (click)="switchTab('view')">👤 Details</button>
+    <button class="ptab" [class.ptab-active]="activeTab() === 'edit'"
+      (click)="switchTab('edit')">✏ Edit</button>
+    <button class="ptab" [class.ptab-active]="activeTab() === 'photo'"
+      (click)="switchTab('photo')">🖼 Photo</button>
+    <button class="ptab" [class.ptab-active]="activeTab() === 'email'"
+      (click)="switchTab('email')">📧 Email</button>
+    <button class="ptab" [class.ptab-active]="activeTab() === 'password'"
+      (click)="switchTab('password')">🔒 Password</button>
+  </div>
+
+  <!-- ══ VIEW TAB ══ -->
+  @if (activeTab() === 'view') {
+    <div class="detail-sections">
+
+      <!-- Personal Info -->
+      <div class="detail-card">
+        <div class="dc-title">👤 Personal Information</div>
+        <div class="detail-grid">
+          <div class="dg-item"><span>Username</span><strong>{{ profile().username }}</strong></div>
+          <div class="dg-item"><span>Full Name</span><strong>{{ profile().fullName || '—' }}</strong></div>
+          <div class="dg-item"><span>Email</span><strong>{{ profile().email }}</strong></div>
+          <div class="dg-item"><span>Phone</span><strong>{{ profile().phone || '—' }}</strong></div>
+          <div class="dg-item"><span>Date of Birth</span><strong>{{ profile().dateOfBirth || '—' }}</strong></div>
+          <div class="dg-item"><span>Gender</span><strong>{{ profile().gender || '—' }}</strong></div>
+          <div class="dg-item"><span>Role</span><strong>{{ profile().role }}</strong></div>
+          <div class="dg-item"><span>Status</span><strong>{{ profile().status }}</strong></div>
+        </div>
+      </div>
+
+      <!-- Address Info -->
+      <div class="detail-card">
+        <div class="dc-title">🏠 Address Information</div>
+        @if (profile().addressLine || profile().city) {
+          <div class="detail-grid">
+            <div class="dg-item full"><span>Address</span><strong>{{ profile().addressLine || '—' }}</strong></div>
+            <div class="dg-item"><span>City</span><strong>{{ profile().city || '—' }}</strong></div>
+            <div class="dg-item"><span>State</span><strong>{{ profile().state || '—' }}</strong></div>
+            <div class="dg-item"><span>Pincode</span><strong>{{ profile().pincode || '—' }}</strong></div>
+          </div>
+        } @else {
+          <div class="no-address">
+            <p>No address added yet.</p>
+            <button class="add-addr-btn" (click)="switchTab('edit')">+ Add Address</button>
+          </div>
+        }
+      </div>
+
+      <!-- Account Meta -->
+      <div class="detail-card">
+        <div class="dc-title">⚙ Account Information</div>
+        <div class="detail-grid">
+          <div class="dg-item"><span>Member Since</span><strong>{{ profile().createdAt }}</strong></div>
+          <div class="dg-item"><span>Last Updated</span><strong>{{ profile().updatedAt || '—' }}</strong></div>
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- ══ EDIT TAB ══ -->
+  @if (activeTab() === 'edit') {
+    <div class="form-card">
+      <div class="fc-title">Edit Profile</div>
+      @if (editError()) { <div class="p-alert p-err">{{ editError() }}</div> }
+
+      <div class="form-section">
+        <h4>Personal Details</h4>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Full Name</label>
+            <input type="text" class="p-input" [(ngModel)]="editForm.fullName"
+              placeholder="Your full name" />
+          </div>
+          <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" class="p-input" [(ngModel)]="editForm.phone"
+              placeholder="10-digit mobile" maxlength="10" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Date of Birth</label>
+            <input type="date" class="p-input" [(ngModel)]="editForm.dateOfBirth"
+              [max]="maxDob" />
+          </div>
+          <div class="form-group">
+            <label>Gender</label>
+            <select class="p-input" [(ngModel)]="editForm.gender">
+              <option value="">Select...</option>
+              <option value="MALE">Male</option>
+              <option value="FEMALE">Female</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h4>Address</h4>
+        <div class="form-group">
+          <label>Address Line</label>
+          <input type="text" class="p-input" [(ngModel)]="editForm.addressLine"
+            placeholder="House no., Street, Area, Landmark" />
+        </div>
+        <div class="form-row form-row-3">
+          <div class="form-group">
+            <label>City</label>
+            <input type="text" class="p-input" [(ngModel)]="editForm.city"
+              placeholder="City" />
+          </div>
+          <div class="form-group">
+            <label>State</label>
+            <select class="p-input" [(ngModel)]="editForm.state">
+              <option value="">Select state...</option>
+              @for (st of indianStates; track st) {
+                <option [value]="st">{{ st }}</option>
+              }
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Pincode</label>
+            <input type="text" class="p-input" [(ngModel)]="editForm.pincode"
+              placeholder="6-digit" maxlength="6" />
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="p-btn-outline" (click)="switchTab('view')">Cancel</button>
+        <button class="p-btn-primary" (click)="saveProfile()" [disabled]="editLoading()">
+          @if (editLoading()) { <span class="spinner"></span> } Save Changes
+        </button>
+      </div>
+    </div>
+  }
+
+  <!-- ══ PHOTO TAB ══ -->
+  @if (activeTab() === 'photo') {
+    <div class="form-card photo-card">
+      <div class="fc-title">Profile Photo</div>
+      @if (photoError()) { <div class="p-alert p-err">{{ photoError() }}</div> }
+
+      <!-- Current / Preview -->
+      <div class="photo-preview-wrap">
+        @if (photoPreview()) {
+          <img [src]="photoPreview()!" class="photo-preview" alt="Preview" />
+        } @else {
+          <div class="photo-placeholder">
+            <div class="pp-initials">{{ getInitials() }}</div>
+            <p>No photo</p>
+          </div>
+        }
+      </div>
+
+      <!-- Upload Zone -->
+      <div class="photo-upload-zone">
+        <label class="puz-label" for="photoInput">
+          <span class="puz-icon">📷</span>
+          <span class="puz-text">Click to select photo</span>
+          <span class="puz-hint">JPG or PNG · Max 2MB</span>
+          <input type="file" id="photoInput"
+            (change)="onPhotoSelect($event)"
+            accept=".jpg,.jpeg,.png" />
+        </label>
+      </div>
+
+      <div class="photo-actions">
+        <button class="p-btn-outline" (click)="cancelPhoto()">Cancel</button>
+        @if (profile().profilePhotoBase64) {
+          <button class="p-btn-danger" (click)="removePhoto()">🗑 Remove Photo</button>
+        }
+        @if (selectedPhoto) {
+          <button class="p-btn-primary" (click)="uploadPhoto()" [disabled]="photoLoading()">
+            @if (photoLoading()) { <span class="spinner"></span> } Upload Photo
+          </button>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- ══ EMAIL TAB ══ -->
+  @if (activeTab() === 'email') {
+    <div class="form-card">
+      <div class="fc-title">Change Email Address</div>
+      <p class="fc-sub">Current email: <strong>{{ profile().email }}</strong></p>
+
+      @if (emailError())   { <div class="p-alert p-err">{{ emailError() }}</div> }
+      @if (emailSuccess()) { <div class="p-alert p-ok">{{ emailSuccess() }}</div> }
+
+      <div class="form-group">
+        <label>New Email Address</label>
+        <input type="email" class="p-input" [(ngModel)]="newEmail"
+          placeholder="newemail@example.com"
+          [disabled]="emailOtpSent()" />
+      </div>
+
+      @if (!emailOtpSent()) {
+        <button class="p-btn-primary" (click)="sendEmailOtp()"
+          [disabled]="emailOtpLoading()">
+          @if (emailOtpLoading()) { <span class="spinner"></span> }
+          Send OTP to New Email →
+        </button>
+      } @else {
+        <div class="form-group">
+          <label>OTP (sent to {{ newEmail }})</label>
+          <input type="text" class="p-input otp-input"
+            [(ngModel)]="emailOtp"
+            placeholder="6-digit OTP"
+            maxlength="6" inputmode="numeric" />
+        </div>
+
+        <div class="otp-footer">
+          @if (emailCooldown() > 0) {
+            <span class="cooldown">Resend in {{ emailCooldown() }}s</span>
+          } @else {
+            <button class="link-btn" (click)="sendEmailOtp()"
+              [disabled]="emailOtpLoading()">
+              Resend OTP
+            </button>
+          }
+          <button class="link-btn" (click)="emailOtpSent.set(false); emailOtp = ''">
+            Change email
+          </button>
+        </div>
+
+        <div class="form-actions">
+          <button class="p-btn-outline" (click)="switchTab('view')">Cancel</button>
+          <button class="p-btn-primary" (click)="updateEmail()"
+            [disabled]="emailVerifyLoading()">
+            @if (emailVerifyLoading()) { <span class="spinner"></span> }
+            Verify & Update Email
+          </button>
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ══ PASSWORD TAB ══ -->
+  @if (activeTab() === 'password') {
+    <div class="form-card pw-card">
+      <div class="fc-title">Change Password</div>
+
+      @if (pwError())   { <div class="p-alert p-err">{{ pwError() }}</div> }
+      @if (pwSuccess()) { <div class="p-alert p-ok">{{ pwSuccess() }}</div> }
+
+      <div class="form-group">
+        <label>Current Password</label>
+        <div class="pw-wrap">
+          <input [type]="showCurrent() ? 'text' : 'password'"
+            class="p-input" [(ngModel)]="currentPassword"
+            placeholder="Enter current password" />
+          <button class="pw-toggle" (click)="showCurrent.update(v => !v)">
+            {{ showCurrent() ? 'Hide' : 'Show' }}
+          </button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>New Password</label>
+        <div class="pw-wrap">
+          <input [type]="showNew() ? 'text' : 'password'"
+            class="p-input" [(ngModel)]="newPassword"
+            placeholder="Minimum 6 characters" />
+          <button class="pw-toggle" (click)="showNew.update(v => !v)">
+            {{ showNew() ? 'Hide' : 'Show' }}
+          </button>
+        </div>
+        @if (newPassword.length > 0) {
+          <div class="str-wrap">
+            <div class="str-bar">
+              <div class="str-fill"
+                [class]="getPasswordStrength(newPassword).cls"
+                [style.width.%]="getPasswordStrength(newPassword).w">
+              </div>
+            </div>
+            <span class="str-lbl"
+              [class]="getPasswordStrength(newPassword).cls">
+              {{ getPasswordStrength(newPassword).label }}
+            </span>
+          </div>
+        }
+      </div>
+
+      <div class="form-group">
+        <label>Confirm New Password</label>
+        <div class="pw-wrap">
+          <input [type]="showConfirm() ? 'text' : 'password'"
+            class="p-input"
+            [class.is-ok]="confirmPassword && newPassword === confirmPassword"
+            [(ngModel)]="confirmPassword"
+            placeholder="Re-enter new password" />
+          <button class="pw-toggle" (click)="showConfirm.update(v => !v)">
+            {{ showConfirm() ? 'Hide' : 'Show' }}
+          </button>
+        </div>
+        @if (confirmPassword && newPassword === confirmPassword) {
+          <span class="hint-ok">✓ Passwords match</span>
+        }
+      </div>
+
+      <div class="form-actions">
+        <button class="p-btn-outline" (click)="switchTab('view')">Cancel</button>
+        <button class="p-btn-primary" (click)="changePassword()"
+          [disabled]="pwLoading()">
+          @if (pwLoading()) { <span class="spinner"></span> }
+          🔒 Change Password
+        </button>
+      </div>
+    </div>
+  }
+}

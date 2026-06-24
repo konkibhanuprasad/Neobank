@@ -1,0 +1,34 @@
+<header class="top-header">
+  <div class="header-left">
+    <button class="hamburger" (click)="toggleSidebarEvt.emit()">☰</button>
+    <div class="page-title">
+      <div class="title-label">Admin console</div>
+      <h2>{{ pageTitle }}</h2>
+    </div>
+  </div>
+
+  <div class="header-right">
+    <button class="h-btn" (click)="toggleTheme()" title="Toggle theme">
+      {{ isDark() ? '☀️' : '🌙' }}
+    </button>
+
+    <button class="h-btn notif-btn" title="Notifications">
+      🔔<span class="notif-dot"></span>
+    </button>
+
+    <button class="quick-summary">
+      <span>Live</span>
+      <strong>Bank Ops</strong>
+    </button>
+
+    <div class="h-user">
+      <div class="h-avatar">{{ getUserInitials() }}</div>
+      <div class="h-info">
+        <div class="h-name">{{ fullName || username }}</div>
+        <div class="h-role">{{ role }}</div>
+      </div>
+    </div>
+
+    <button class="h-btn h-logout" (click)="logoutEvt.emit()" title="Logout"> ⤷ </button>
+  </div>
+</header>

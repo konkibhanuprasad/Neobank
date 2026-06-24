@@ -1,0 +1,132 @@
+<div class="insights-page" [class.dark]="isDarkMode">
+
+  @if (loading) {
+    <div class="loading-box">
+      Loading insights...
+    </div>
+  }
+
+  @if (!loading && errorMessage) {
+    <div class="error-box">
+      {{ errorMessage }}
+    </div>
+  }
+
+  @if (!loading && insights) {
+
+    <div class="insights-top">
+      <div>
+        <h1>Financial Insights</h1>
+        <p>Spending, savings, income and expense analytics.</p>
+      </div>
+
+      <button class="refresh-btn" type="button" (click)="loadInsights()">
+        Refresh
+      </button>
+    </div>
+
+    <div class="metric-grid">
+
+      <div class="metric-card">
+        <span>Total Income</span>
+        <strong class="green">Rs {{ insights.totalIncome }}</strong>
+      </div>
+
+      <div class="metric-card">
+        <span>Total Expense</span>
+        <strong class="red">Rs {{ insights.totalExpense }}</strong>
+      </div>
+
+      <div class="metric-card">
+        <span>Savings</span>
+        <strong class="blue">Rs {{ insights.savings }}</strong>
+      </div>
+
+    </div>
+
+    <div class="chart-card">
+      <h2>Income vs Expense Trend</h2>
+
+      <div class="chart-wrapper">
+        <canvas
+          baseChart
+          [data]="chartData"
+          [options]="chartOptions"
+          [type]="'line'">
+        </canvas>
+      </div>
+    </div>
+
+    <!-- ✅ FIX: Moved analytics grid INSIDE the insights data check -->
+    <div class="analytics-grid">
+
+      <div class="analytics-card">
+        <h2>Spending Analytics</h2>
+
+        <div class="small-chart-wrapper">
+          <canvas
+            baseChart
+            [data]="spendingChartData"
+            [options]="spendingChartOptions"
+            [type]="'doughnut'">
+          </canvas>
+        </div>
+      </div>
+
+      <div class="analytics-card">
+        <h2>Budget vs Actual</h2>
+
+        <div class="small-chart-wrapper">
+          <canvas
+            baseChart
+            [data]="budgetChartData"
+            [options]="budgetChartOptions"
+            [type]="'bar'">
+          </canvas>
+        </div>
+      </div>
+
+      <div class="analytics-card">
+        <h2>Net Worth Progression</h2>
+
+        <div class="small-chart-wrapper">
+          <canvas
+            baseChart
+            [data]="netWorthChartData"
+            [options]="netWorthChartOptions"
+            [type]="'line'">
+          </canvas>
+        </div>
+      </div>
+
+      <div class="analytics-card">
+        <h2>Reward Growth</h2>
+
+        <div class="small-chart-wrapper">
+          <canvas
+            baseChart
+            [data]="rewardChartData"
+            [options]="rewardChartOptions"
+            [type]="'bar'">
+          </canvas>
+        </div>
+      </div>
+
+      <div class="analytics-card">
+        <h2>Loan Payoff Forecast</h2>
+
+        <div class="small-chart-wrapper">
+          <canvas
+            baseChart
+            [data]="loanPayoffChartData"
+            [options]="loanPayoffChartOptions"
+            [type]="'line'">
+          </canvas>
+        </div>
+      </div>
+
+    </div>
+
+  }
+
+</div>

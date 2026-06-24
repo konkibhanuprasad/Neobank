@@ -1,0 +1,127 @@
+<div class="system-logs-page">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div>
+      <h1>System Audit Logs</h1>
+      <p>Monitor API execution time, errors, and activity across all endpoints.</p>
+    </div>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Status Filter</mat-label>
+      <mat-select
+        [(ngModel)]="selectedStatus"
+        (selectionChange)="onStatusChange()">
+
+        <mat-option [value]="undefined">All</mat-option>
+        <mat-option [value]="200">200 OK</mat-option>
+        <mat-option [value]="400">400 Bad Request</mat-option>
+        <mat-option [value]="401">401 Unauthorized</mat-option>
+        <mat-option [value]="403">403 Forbidden</mat-option>
+        <mat-option [value]="500">500 Server Error</mat-option>
+
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <!-- Loader -->
+  @if (loading) {
+    <app-skeleton-loader [rows]="8"></app-skeleton-loader>
+  }
+
+  <!-- Content -->
+  @if (!loading) {
+
+    <!-- Stats summary -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-value">{{ totalElements }}</div>
+        <div class="stat-label">Total Logs</div>
+      </div>
+      <div class="stat-card success">
+        <div class="stat-value">{{ successCount }}</div>
+        <div class="stat-label">Success</div>
+      </div>
+      <div class="stat-card error">
+        <div class="stat-value">{{ errorCount }}</div>
+        <div class="stat-label">Errors</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="chart-grid">
+      <app-chart-card title="Success vs Error Rate">
+        <div class="chart-container">
+          <canvas
+            baseChart
+            [data]="errorRateData"
+            [options]="chartOptions"
+            [type]="'doughnut'">
+          </canvas>
+        </div>
+      </app-chart-card>
+
+      <app-chart-card title="Response Time Trend">
+        <div class="chart-container">
+          <canvas
+            baseChart
+            [data]="responseTimeData"
+            [options]="chartOptions"
+            [type]="'line'">
+          </canvas>
+        </div>
+      </app-chart-card>
+    </div>
+
+    <!-- Table -->
+    <div class="table-card">
+      @if (logs.length === 0) {
+        <div class="empty-state">
+          <div class="empty-icon">📋</div>
+          <p>No logs found for the selected filter.</p>
+        </div>
+      } @else {
+        <table class="logs-table">
+          <thead>
+            <tr>
+              <th>Timestamp</th>
+              <th>Endpoint</th>
+              <th>Method</th>
+              <th>Status</th>
+              <th>Execution Time</th>
+              <th>User ID</th>
+              <th>Error</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            @for (log of logs; track log.id) {
+              <tr>
+                <td>{{ log.eventTimestamp | date:'dd/MM/yy HH:mm:ss' }}</td>
+                <td class="endpoint-cell" [title]="log.endpoint">{{ log.endpoint }}</td>
+                <td><span class="method-badge method-{{ log.httpMethod?.toLowerCase() }}">{{ log.httpMethod }}</span></td>
+                <td>
+                  <span [class]="'status-badge ' + getStatusClass(log.responseStatus)">
+                    {{ log.responseStatus }}
+                  </span>
+                </td>
+                <td>{{ log.executionTimeMs }} ms</td>
+                <td>{{ log.actingUserId || '-' }}</td>
+                <td class="error-cell" [title]="log.errorMessage || ''">{{ log.errorMessage || '-' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <!-- Pagination -->
+        <div class="pagination">
+          <button class="pg-btn" (click)="prevPage()" [disabled]="page === 0">‹ Prev</button>
+          <span class="pg-info">Page {{ page + 1 }} of {{ totalPages || 1 }}</span>
+          <button class="pg-btn" (click)="nextPage()" [disabled]="page >= totalPages - 1">Next ›</button>
+        </div>
+      }
+    </div>
+
+  }
+
+</div>

@@ -1,0 +1,757 @@
+<!------- customer-card.component.html ------->
+
+<!-- ── Layout Alerts ── -->
+@if (error()) {
+  <div class="page-alert err">
+    <span>{{ error() }}</span>
+    <button (click)="error.set('')">✕</button>
+  </div>
+}
+@if (success()) {
+  <div class="page-alert ok">
+    <span>{{ success() }}</span>
+    <button (click)="success.set('')">✕</button>
+  </div>
+}
+
+<!-- ── Tabs ── -->
+<div class="card-tabs">
+  <button class="ctab" [class.ctab-active]="activeTab() === 'cards'"
+    (click)="switchTab('cards')">💳 My Cards</button>
+  <button class="ctab" [class.ctab-active]="activeTab() === 'transfer'"
+    (click)="switchTab('transfer')">↔ Card Transfer</button>
+  <button class="ctab" [class.ctab-active]="activeTab() === 'history'"
+    (click)="switchTab('history')">📋 History</button>
+</div>
+
+<!-- ══════════════════
+     TAB 1: MY CARDS
+══════════════════════ -->
+@if (activeTab() === 'cards') {
+  <div class="section-head">
+    <div>
+      <h1>My Debit Cards</h1>
+      <p>Manage your NeoBank debit cards</p>
+    </div>
+    <button class="c-btn-primary" (click)="openRequest()">
+      + Request Card
+    </button>
+  </div>
+
+  @if (cardsLoading()) {
+    <div class="c-loading"><div class="spin-ring"></div></div>
+  } @else if (cards().length === 0) {
+    <div class="placeholder">
+      <div class="ph-icon">💳</div>
+      <h3>No Cards Yet</h3>
+      <p>Request a debit card. Admin will approve within 1-2 business days.</p>
+      <button class="c-btn-primary" (click)="openRequest()">
+        + Request Debit Card
+      </button>
+    </div>
+  } @else {
+    <div class="cards-grid">
+      @for (card of cards(); track card.id) {
+        <div class="card-wrap">
+
+          <!-- Virtual Card -->
+          <div class="virtual-card"
+            [class.vc-blocked]="card.status === 'BLOCKED'"
+            [class.vc-pending]="card.status === 'PENDING_APPROVAL'"
+            [class.vc-expired]="card.status === 'CANCELLED' || card.status === 'EXPIRED'"
+            [style.--nc]="getNetworkColor(card.network)">
+
+            <div class="vc-top">
+              <span class="vc-bank">NeoBank</span>
+              <span class="vc-net">{{ card.network }}</span>
+            </div>
+            <div class="vc-chip">▮▮</div>
+            <div class="vc-number">{{ card.maskedCardNumber }}</div>
+            <div class="vc-bottom">
+              <div>
+                <div class="vc-lbl">CARDHOLDER</div>
+                <div class="vc-val">{{ card.cardholderName }}</div>
+              </div>
+              <div>
+                <div class="vc-lbl">EXPIRES</div>
+                <div class="vc-val">{{ card.expiryDisplay }}</div>
+              </div>
+              <div>
+                <div class="vc-lbl">CVV</div>
+                <div class="vc-val vc-cvv">•••</div>
+              </div>
+            </div>
+
+            <!-- Overlays -->
+            @if (card.status === 'PENDING_APPROVAL') {
+              <div class="vc-overlay vc-ov-pending">
+                ⏳ PENDING ADMIN APPROVAL
+              </div>
+            }
+            @if (card.status === 'BLOCKED') {
+              <div class="vc-overlay vc-ov-blocked">🔒 BLOCKED</div>
+            }
+            @if (card.status === 'REPLACEMENT_PENDING') {
+              <div class="vc-overlay vc-ov-replace">🔄 REPLACEMENT PENDING</div>
+            }
+          </div>
+
+          <!-- Status Badges -->
+          <div class="card-badge-row">
+            <span class="c-badge" [class]="getStatusClass(card.status)">
+              {{ card.status === 'PENDING_APPROVAL' ? 'PENDING APPROVAL'
+               : card.status === 'REPLACEMENT_PENDING' ? 'REPLACING'
+               : card.status }}
+            </span>
+            <span class="c-badge" [class]="getReqStatusClass(card.requestStatus)">
+              {{ card.requestStatus }}
+            </span>
+          </div>
+
+          <!-- Rejection reason -->
+          @if (card.requestStatus === 'REJECTED' && card.rejectionReason) {
+            <div class="reject-reason">
+              ❌ Rejected: {{ card.rejectionReason }}
+            </div>
+          }
+
+          <!-- Pending notice -->
+          @if (card.requestStatus === 'PENDING') {
+            <div class="pending-notice">
+              ⏳ Card request is under admin review (1-2 business days)
+            </div>
+          }
+
+          <!-- Card Info (only for approved) -->
+          @if (card.requestStatus === 'APPROVED') {
+            <!-- Limits -->
+            <div class="card-limits">
+              <div class="cl-item">
+                <span>🌐 Online</span>
+                <strong>{{ formatAmount(card.onlineLimit) }}</strong>
+              </div>
+              <div class="cl-item">
+                <span>🏧 ATM</span>
+                <strong>{{ formatAmount(card.atmLimit) }}</strong>
+              </div>
+              <div class="cl-item">
+                <span>📅 Daily</span>
+                <strong>{{ formatAmount(card.dailyLimit) }}</strong>
+              </div>
+            </div>
+
+            <!-- PIN status -->
+            <div class="pin-status">
+              @if (!card.pinSet) {
+                <span class="pin-warn">⚠ PIN not set</span>
+              } @else if (card.pinLocked) {
+                <span class="pin-lock">🔒 PIN locked 24h</span>
+              } @else {
+                <span class="pin-ok">✅ PIN set</span>
+              }
+            </div>
+
+            <!-- Actions -->
+            <div class="card-actions">
+              <!-- View Details -->
+              <button class="ca-btn ca-view"
+                (click)="openReveal(card)">
+                👁 View Details
+              </button>
+              <!-- Change PIN -->
+              <button class="ca-btn ca-pin"
+                (click)="openPin(card)">
+                🔢 {{ card.pinSet ? 'Change PIN' : 'Set PIN' }}
+              </button>
+              <!-- Block/Unblock -->
+              @if (card.status === 'ACTIVE') {
+                <button class="ca-btn ca-block"
+                  (click)="openBlock(card)">
+                  🔒 Block
+                </button>
+              }
+              @if (card.status === 'BLOCKED') {
+                <button class="ca-btn ca-unblock"
+                  (click)="unblockCard(card)">
+                  🔓 Unblock
+                </button>
+              }
+              <!-- Limits -->
+              @if (card.status === 'ACTIVE') {
+                <button class="ca-btn" (click)="openLimits(card)">
+                  ⚙ Limits
+                </button>
+              }
+              <!-- Replace -->
+              @if (!card.replacementRequested &&
+                   card.status !== 'CANCELLED') {
+                <button class="ca-btn ca-replace"
+                  (click)="openReplace(card)">
+                  🔄 Replace
+                </button>
+              }
+              <!-- History -->
+              <button class="ca-btn"
+                (click)="selectHistoryCard(card.id); switchTab('history')">
+                📋 History
+              </button>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+}
+
+<!-- ══════════════════════════
+     TAB 2: CARD TRANSFER
+══════════════════════════════ -->
+@if (activeTab() === 'transfer') {
+  <div class="section-head">
+    <h1>Card to Bank Transfer</h1>
+    <p>Transfer money using your card details to any bank account</p>
+  </div>
+
+  @if (transferStep() === 'form') {
+    <div class="transfer-wrap">
+
+      <!-- Left: Sender Card Details -->
+      <div class="transfer-section">
+        <div class="ts-header">💳 Your Card Details</div>
+
+        <div class="form-group">
+          <label>Card Number <span class="req">*</span></label>
+          <input type="text" class="c-input card-input"
+            [value]="senderCardNum"
+            (input)="formatCardInput($event)"
+            placeholder="XXXX XXXX XXXX XXXX"
+            maxlength="19" />
+        </div>
+
+        <div class="form-group">
+          <label>Cardholder Name <span class="req">*</span></label>
+          <input type="text" class="c-input"
+            [(ngModel)]="senderName"
+            placeholder="As on card (ALL CAPS)" />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Expiry (MM/YY) <span class="req">*</span></label>
+            <input type="text" class="c-input"
+              [value]="senderExpiry"
+              (input)="formatExpiryInput($event)"
+              placeholder="MM/YY" maxlength="5" />
+          </div>
+          <div class="form-group">
+            <label>CVV <span class="req">*</span></label>
+            <div class="pw-wrap">
+              <input [type]="showCvv() ? 'text' : 'password'"
+                class="c-input" [(ngModel)]="senderCvv"
+                placeholder="•••" maxlength="3"
+                style="letter-spacing:4px;font-size:18px" />
+              <button class="pw-toggle"
+                (click)="showCvv.update(v=>!v)">
+                {{ showCvv() ? 'Hide' : 'Show' }}
+              </button>
+            </div>
+            <span class="field-hint">3-digit code on back of card</span>
+          </div>
+        </div>
+
+        <!-- OTP Section -->
+        <div class="otp-section">
+          <div class="form-group">
+            <label>Transaction OTP <span class="req">*</span></label>
+            <div class="otp-row">
+              <button class="c-btn-primary otp-btn"
+                (click)="sendTransferOtp()"
+                [disabled]="transferOtpLoad() || transferOtpCool() > 0">
+                @if (transferOtpLoad()) { <span class="spinner"></span> }
+                @if (transferOtpCool() > 0) { Resend in {{ transferOtpCool() }}s }
+                @else { Send OTP }
+              </button>
+            </div>
+            @if (transferOtpSent()) {
+              <input type="text" class="c-input otp-input"
+                [(ngModel)]="transferOtp"
+                placeholder="6-digit OTP from email"
+                maxlength="6" style="margin-top:8px" />
+              <span class="field-hint">
+                OTP sent to registered email.
+                @if (transferOtpCool() > 0) { Resend in {{ transferOtpCool() }}s }
+              </span>
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Receiver Bank Details -->
+      <div class="transfer-section">
+        <div class="ts-header">🏦 Receiver Bank Details</div>
+
+        <div class="form-group">
+          <label>Account Number <span class="req">*</span></label>
+          <input type="text" class="c-input"
+            [(ngModel)]="receiverAccNo"
+            placeholder="Receiver account number" />
+        </div>
+
+        <div class="form-group">
+          <label>IFSC Code <span class="req">*</span></label>
+          <input type="text" class="c-input"
+            [(ngModel)]="receiverIfsc"
+            placeholder="e.g. SBIN0001234"
+            style="text-transform:uppercase"
+            (input)="receiverIfsc = receiverIfsc.toUpperCase()" />
+        </div>
+
+        <div class="form-group">
+          <label>Receiver Name <span class="req">*</span></label>
+          <input type="text" class="c-input"
+            [(ngModel)]="receiverName"
+            placeholder="Account holder name" />
+        </div>
+
+        <div class="form-group">
+          <label>Amount (₹) <span class="req">*</span></label>
+          <div class="amount-wrap">
+            <span class="rupee">₹</span>
+            <input type="number" class="c-input amount-inp"
+              [(ngModel)]="transferAmount"
+              placeholder="0.00" min="1" />
+          </div>
+          <div class="quick-chips">
+            @for (a of [500,1000,2000,5000,10000,25000]; track a) {
+              <button class="qc-chip"
+                (click)="transferAmount = a.toString()">
+                ₹{{ a.toLocaleString() }}
+              </button>
+            }
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Description</label>
+          <input type="text" class="c-input"
+            [(ngModel)]="transferDesc"
+            placeholder="Optional note" />
+        </div>
+
+        <div class="transfer-info">
+          ℹ️ Limits apply per your card's online transaction limit.
+          CVV and card details are verified securely.
+          OTP is required for every transfer.
+        </div>
+
+        <button class="c-btn-primary" style="width:100%"
+          (click)="submitTransfer()"
+          [disabled]="transferLoading()">
+          @if (transferLoading()) { <span class="spinner"></span> }
+          🚀 Transfer Money
+        </button>
+      </div>
+    </div>
+  }
+
+  @if (transferStep() === 'success') {
+    <div class="transfer-success">
+      <div>✅</div>
+      <h3>Transfer Successful!</h3>
+      @if (lastTransfer()) {
+        <div class="ts-ref">Ref: {{ lastTransfer().referenceNumber }}</div>
+        <div class="ts-amt">{{ formatAmount(lastTransfer().amount) }}</div>
+        <div class="ts-rec">To: {{ lastTransfer().receiverName || receiverName }}</div>
+        @if (lastTransfer().balanceAfter) {
+          <div class="ts-bal">New Balance: {{ formatAmount(lastTransfer().balanceAfter) }}</div>
+        }
+      }
+      <button class="c-btn-primary" (click)="resetTransfer()">+ New Transfer</button>
+    </div>
+  }
+}
+
+<!-- ══════════════════
+     TAB 3: HISTORY
+══════════════════════ -->
+@if (activeTab() === 'history') {
+  <div class="section-head">
+    <h1>Card Transaction History</h1>
+  </div>
+
+  <div class="hist-tabs">
+    @for (card of cards(); track card.id) {
+      <button class="hct-btn"
+        [class.hct-active]="historyCardId() === card.id"
+        (click)="selectHistoryCard(card.id)">
+        **** {{ card.last4 }}
+      </button>
+    }
+  </div>
+
+  @if (historyLoading()) {
+    <div class="c-loading"><div class="spin-ring"></div></div>
+  } @else if (history().length === 0) {
+    <div class="placeholder">
+      <div class="ph-icon">📋</div>
+      <h3>No Transactions</h3>
+    </div>
+  } @else {
+    <div class="hist-list">
+      @for (txn of history(); track txn.id) {
+        <div class="hist-item">
+          <div class="hi-icon">{{ getTxnIcon(txn.transactionType) }}</div>
+          <div class="hi-body">
+            <div class="hi-top">
+              <span class="hi-type">
+                {{ txn.transactionType?.replace(/_/g,' ') }}
+              </span>
+              <span class="hi-ref">{{ txn.referenceNumber }}</span>
+            </div>
+            @if (txn.merchantName) { <div class="hi-sub">{{ txn.merchantName }}</div> }
+            @if (txn.beneficiaryName) { <div class="hi-sub">To: {{ txn.beneficiaryName }}</div> }
+            <div class="hi-date">{{ txn.createdAt }}</div>
+          </div>
+          <div class="hi-right">
+            <div class="hi-amt">−{{ formatAmount(txn.amount) }}</div>
+            @if (txn.balanceAfter) {
+              <div class="hi-bal">Bal: {{ formatAmount(txn.balanceAfter) }}</div>
+            }
+            <span class="hi-st"
+              [class]="txn.status === 'SUCCESS' ? 'st-ok' : 'st-err'">
+              {{ txn.status }}
+            </span>
+          </div>
+        </div>
+      }
+    </div>
+    @if (histTotalPages() > 1) {
+      <div class="pagination">
+        <button class="pg-btn" [disabled]="histPage() === 0"
+          (click)="histGoToPage(histPage()-1)">← Prev</button>
+        <span>{{ histPage()+1 }} / {{ histTotalPages() }}</span>
+        <button class="pg-btn" [disabled]="histPage() >= histTotalPages()-1"
+          (click)="histGoToPage(histPage()+1)">Next →</button>
+      </div>
+    }
+  }
+}
+
+<!-- ══ MODALS ══ -->
+@if (modal() !== 'none') {
+  <div class="c-overlay" (click)="closeModal()"></div>
+  <div class="c-modal-wrap">
+    <div class="c-modal">
+
+      <!-- REQUEST CARD MODAL -->
+      @if (modal() === 'request') {
+        <div class="cm-header">
+          <h3>💳 Request Debit Card</h3>
+          <button class="cm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="cm-body">
+          @if (requestError()) { <div class="c-err-box">{{ requestError() }}</div> }
+
+          <div class="req-info">
+            ℹ️ Card requests are reviewed by admin within 1-2 business days.
+            You'll be notified via email when approved.
+          </div>
+
+          <div class="form-group">
+            <label>Link to Account <span class="req">*</span></label>
+            <select class="c-input" [(ngModel)]="requestAccount">
+              @for (acc of accounts; track acc.accountNumber) {
+                <option [value]="acc.accountNumber">
+                  {{ acc.accountType }} · {{ acc.accountNumber }}
+                </option>
+              }
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Card Network</label>
+            <div class="net-sel">
+              @for (net of networks; track net) {
+                <button class="net-btn"
+                  [class.net-sel-active]="requestNetwork === net"
+                  (click)="requestNetwork = net">
+                  {{ net }}
+                </button>
+              }
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Reason for Card Request</label>
+            <input type="text" class="c-input"
+              [(ngModel)]="requestReason"
+              placeholder="e.g. First card, Online shopping..." />
+          </div>
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="closeModal()">Cancel</button>
+          <button class="c-btn-primary" (click)="submitRequest()"
+            [disabled]="requestLoading()">
+            @if (requestLoading()) { <span class="spinner"></span> }
+            Submit Request
+          </button>
+        </div>
+      }
+
+      <!-- REVEAL DETAILS MODAL -->
+      @if (modal() === 'reveal') {
+        <div class="cm-header">
+          <h3>👁 View Card Details</h3>
+          <button class="cm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="cm-body">
+          @if (revealError()) { <div class="c-err-box">{{ revealError() }}</div> }
+
+          @if (!revealedDetails()) {
+            <div class="reveal-warn">
+              ⚠ For security, card details require OTP verification.
+              Full details will also be sent to your registered email.
+            </div>
+
+            @if (!revealOtpSent()) {
+              <button class="c-btn-primary w-full"
+                (click)="sendRevealOtp()"
+                [disabled]="revealOtpLoading()">
+                @if (revealOtpLoading()) { <span class="spinner"></span> }
+                Send OTP to Reveal Details
+              </button>
+            } @else {
+              <div class="form-group">
+                <label>Enter OTP <span class="req">*</span></label>
+                <input type="text" class="c-input otp-input"
+                  [(ngModel)]="revealOtp"
+                  placeholder="6-digit OTP" maxlength="6" />
+                @if (revealCooldown() > 0) {
+                  <span class="field-hint">Resend in {{ revealCooldown() }}s</span>
+                } @else {
+                  <button class="link-btn" (click)="sendRevealOtp()">
+                    Resend OTP
+                  </button>
+                }
+              </div>
+              <button class="c-btn-primary w-full"
+                (click)="revealDetails()"
+                [disabled]="revealLoading()">
+                @if (revealLoading()) { <span class="spinner"></span> }
+                Reveal Card Details
+              </button>
+            }
+          } @else {
+            <!-- Revealed details -->
+            <div class="revealed-card">
+              <div class="rc-row">
+                <span>Card Number</span>
+                <strong class="rc-num">{{ revealedDetails().cardNumber }}</strong>
+              </div>
+              <div class="rc-row">
+                <span>Cardholder</span>
+                <strong>{{ revealedDetails().cardholderName }}</strong>
+              </div>
+              <div class="rc-row">
+                <span>Expiry</span>
+                <strong>{{ revealedDetails().expiryDisplay }}</strong>
+              </div>
+              <div class="rc-row">
+                <span>CVV</span>
+                <strong>{{ revealedDetails().cvv }}</strong>
+              </div>
+              <div class="rc-row">
+                <span>Network</span>
+                <strong>{{ revealedDetails().network }}</strong>
+              </div>
+            </div>
+            <div class="reveal-warn">
+              ⚠ Full card details have been sent to your registered email.
+              Never share your card details with anyone.
+            </div>
+          }
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="closeModal()">Close</button>
+        </div>
+      }
+
+      <!-- CHANGE PIN MODAL -->
+      @if (modal() === 'pin') {
+        <div class="cm-header">
+          <h3>🔢 {{ selectedCard()?.pinSet ? 'Change' : 'Set' }} Card PIN</h3>
+          <button class="cm-close" (click)="closePinModal()">✕</button>
+        </div>
+        <div class="cm-body">
+          @if (pinError()) { <div class="c-err-box">{{ pinError() }}</div> }
+
+          @if (!pinOtpSent()) {
+            <p class="modal-desc">OTP will be sent to your registered email.</p>
+            <button class="c-btn-primary w-full"
+              (click)="sendPinOtp()" [disabled]="pinOtpLoading()">
+              @if (pinOtpLoading()) { <span class="spinner"></span> }
+              Send OTP →
+            </button>
+          } @else {
+            <div class="form-group">
+              <label>OTP from Email <span class="req">*</span></label>
+              <input type="text" class="c-input otp-input"
+                [(ngModel)]="pinOtp" placeholder="6-digit OTP" maxlength="6" />
+              @if (pinCooldown() > 0) {
+                <span class="field-hint">Resend in {{ pinCooldown() }}s</span>
+              } @else {
+                <button class="link-btn" (click)="sendPinOtp()">Resend OTP</button>
+              }
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>New PIN (4 digits) <span class="req">*</span></label>
+                <div class="pw-wrap">
+                  <input [type]="showPin() ? 'text' : 'password'"
+                    class="c-input" [(ngModel)]="newPin"
+                    placeholder="••••" maxlength="4" />
+                  <button class="pw-toggle"
+                    (click)="showPin.update(v=>!v)">
+                    {{ showPin() ? 'Hide' : 'Show' }}
+                  </button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Confirm PIN <span class="req">*</span></label>
+                <input [type]="showPin() ? 'text' : 'password'"
+                  class="c-input"
+                  [class.is-ok]="confirmPin && newPin === confirmPin"
+                  [(ngModel)]="confirmPin" placeholder="••••" maxlength="4" />
+                @if (confirmPin && newPin === confirmPin) {
+                  <span class="hint-ok">✓ Match</span>
+                }
+              </div>
+            </div>
+          }
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="closePinModal()">Cancel</button>
+          @if (pinOtpSent()) {
+            <button class="c-btn-primary" (click)="changePin()"
+              [disabled]="pinLoading()">
+              @if (pinLoading()) { <span class="spinner"></span> }
+              Set PIN
+            </button>
+          }
+        </div>
+      }
+
+      <!-- BLOCK MODAL -->
+      @if (modal() === 'block') {
+        <div class="cm-header">
+          <h3>🔒 Block Card</h3>
+          <button class="cm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="cm-body">
+          <div class="modal-card-info">
+            Card: <strong>{{ selectedCard()?.maskedCardNumber }}</strong>
+          </div>
+          <div class="form-group">
+            <label>Reason (optional)</label>
+            <input type="text" class="c-input" [(ngModel)]="blockReason"
+              placeholder="e.g. Lost card, suspicious activity..." />
+          </div>
+          <div class="cm-warn">
+            ⚠ Card will be blocked immediately.
+            You can unblock it anytime from the app.
+          </div>
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="closeModal()">Cancel</button>
+          <button class="c-btn-danger" (click)="confirmBlock()"
+            [disabled]="blockLoading()">
+            @if (blockLoading()) { <span class="spinner"></span> }
+            🔒 Block Card
+          </button>
+        </div>
+      }
+
+      <!-- LIMITS MODAL -->
+      @if (modal() === 'limits') {
+        <div class="cm-header">
+          <h3>⚙ Update Transaction Limits</h3>
+          <button class="cm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="cm-body">
+          @if (limitsError()) { <div class="c-err-box">{{ limitsError() }}</div> }
+          <div class="form-group">
+            <label>🌐 Online Limit (max ₹2,00,000)</label>
+            <div class="amount-wrap">
+              <span class="rupee">₹</span>
+              <input type="number" class="c-input amount-inp"
+                [(ngModel)]="limitsOnline" min="1" max="200000" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>🏧 ATM Limit (max ₹50,000)</label>
+            <div class="amount-wrap">
+              <span class="rupee">₹</span>
+              <input type="number" class="c-input amount-inp"
+                [(ngModel)]="limitsAtm" min="1" max="50000" />
+            </div>
+          </div>
+          <div class="form-group">
+            <label>📅 Daily Limit (max ₹5,00,000)</label>
+            <div class="amount-wrap">
+              <span class="rupee">₹</span>
+              <input type="number" class="c-input amount-inp"
+                [(ngModel)]="limitsDaily" min="1" max="500000" />
+            </div>
+          </div>
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="closeModal()">Cancel</button>
+          <button class="c-btn-primary" (click)="saveLimits()"
+            [disabled]="limitsLoading()">
+            @if (limitsLoading()) { <span class="spinner"></span> }
+            Save Limits
+          </button>
+        </div>
+      }
+
+      <!-- REPLACEMENT MODAL -->
+      @if (modal() === 'replace') {
+        <div class="cm-header">
+          <h3>🔄 Request Replacement</h3>
+          <button class="cm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="cm-body">
+          @if (replaceError()) { <div class="c-err-box">{{ replaceError() }}</div> }
+          <div class="modal-card-info">
+            Current: <strong>{{ selectedCard()?.maskedCardNumber }}</strong>
+          </div>
+          <div class="form-group">
+            <label>Reason <span class="req">*</span></label>
+            <div class="reason-list">
+              @for (r of replacementReasons; track r) {
+                <label class="reason-opt">
+                  <input type="radio" [(ngModel)]="replaceReason" [value]="r" />
+                  {{ r }}
+                </label>
+              }
+            </div>
+          </div>
+          <div class="cm-info">
+            ℹ️ Current card will be cancelled. A new card request will be
+            submitted for admin approval. New card details will be sent
+            to your registered email after admin approval.
+          </div>
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="closeModal()">Cancel</button>
+          <button class="c-btn-primary" (click)="confirmReplace()"
+            [disabled]="replaceLoading()">
+            @if (replaceLoading()) { <span class="spinner"></span> }
+            Request Replacement
+          </button>
+        </div>
+      }
+
+    </div>
+  </div>
+}

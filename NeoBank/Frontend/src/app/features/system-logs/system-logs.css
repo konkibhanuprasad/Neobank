@@ -1,0 +1,87 @@
+.system-logs-page {
+  padding: 24px;
+  background: #f7f9fc;
+  min-height: 100vh;
+}
+
+/* ✅ Header */
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.page-header h1 {
+  margin: 0;
+  font-size: 28px;
+  color: #111827;
+}
+
+.page-header p {
+  margin: 4px 0 0;
+  color: #6b7280;
+}
+
+/* ✅ Charts */
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.chart-container {
+  height: 260px;
+}
+
+/* ✅ Table Card */
+.table-card {
+  margin-top: 24px;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 20px;
+  overflow-x: auto;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.06);
+}
+
+/* ✅ Table */
+.logs-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.logs-table th,
+.logs-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 14px;
+}
+
+/* ✅ Status Colors */
+.status-success {
+  color: #059669;
+  font-weight: 700;
+}
+
+.status-client-error {
+  color: #d97706;
+  font-weight: 700;
+}
+
+.status-server-error {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+/* ✅ Responsive */
+@media (max-width: 768px) {
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chart-grid {
+    grid-template-columns: 1fr;
+  }
+}

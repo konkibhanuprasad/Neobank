@@ -1,0 +1,177 @@
+<!------- admin-dashboard.component.html ------->
+
+<div class="admin-dashboard">
+  <section class="dashboard-hero">
+    <div class="hero-copy">
+      <span class="eyebrow">Admin intelligence</span>
+      <h1>NeoBank operations dashboard</h1>
+      <p>Manage customers, approvals, accounts, and transaction flow from one secure banking console.</p>
+    </div>
+
+    <div class="hero-actions">
+      <button class="btn-primary" (click)="loadStats()" [disabled]="statsLoading()">Refresh data</button>
+      <button class="btn-secondary" (click)="navigateTo.emit('applications-pending')">Review pending applications</button>
+    </div>
+  </section>
+
+  @if (statsLoading()) {
+    <div class="loading-state">
+      <div class="spin-ring"></div>
+      <p>Loading dashboard metrics...</p>
+    </div>
+  }
+
+  @if (stats() && !statsLoading()) {
+    <section class="summary-grid">
+      <article class="summary-card card-glow blue">
+        <div class="card-top">
+          <span>Total customers</span>
+          <span class="card-icon">👥</span>
+        </div>
+        <h2>{{ stats().totalUsers }}</h2>
+        <p>Active: {{ stats().activeUsers }}</p>
+      </article>
+
+      <article class="summary-card card-glow green">
+        <div class="card-top">
+          <span>Accounts</span>
+          <span class="card-icon">🏦</span>
+        </div>
+        <h2>{{ stats().totalAccounts }}</h2>
+        <p>Frozen: {{ stats().frozenAccounts }}</p>
+      </article>
+
+      <article class="summary-card card-glow purple">
+        <div class="card-top">
+          <span>Applications</span>
+          <span class="card-icon">📋</span>
+        </div>
+        <h2>{{ stats().totalApplications }}</h2>
+        <p>Pending: {{ stats().pendingApplications }}</p>
+      </article>
+
+      <article class="summary-card card-glow orange">
+        <div class="card-top">
+          <span>Daily volume</span>
+          <span class="card-icon">💸</span>
+        </div>
+        <h2>{{ formatAmount(stats().todayTransactionVolume) }}</h2>
+        <p>Total transactions: {{ stats().todayTransactions }}</p>
+      </article>
+    </section>
+
+    <section class="quick-actions">
+      <button class="action-pill" (click)="navigateTo.emit('applications-pending')">
+        <span>🚀 Review pending approvals</span>
+        <small>Process new customer applications</small>
+      </button>
+      <button class="action-pill" (click)="navigateTo.emit('transactions')">
+        <span>💳 View transactions</span>
+        <small>Monitor cashflow and settlements</small>
+      </button>
+      <button class="action-pill" (click)="navigateTo.emit('accounts-all')">
+        <span>🧾 Manage accounts</span>
+        <small>Open, freeze, or close accounts</small>
+      </button>
+      <button class="action-pill" (click)="navigateTo.emit('users-all')">
+        <span>👤 Customer directory</span>
+        <small>Review customer profiles</small>
+      </button>
+    </section>
+
+    <section class="insight-panels">
+      <div class="panel panel-large">
+        <div class="panel-head">
+          <div>
+            <h3>Transaction volume trend</h3>
+            <p>Snapshot of payment flows and daily throughput.</p>
+          </div>
+          <span class="tag">Live data</span>
+        </div>
+        <div class="chart-placeholder">
+          <div>
+            <strong>{{ formatAmount(stats().totalTransactionVolume) }}</strong>
+            <p>Total volume this month</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel panel-summary">
+        <div class="panel-head">
+          <div>
+            <h3>Bank snapshot</h3>
+            <p>Key performance metrics for quick review.</p>
+          </div>
+        </div>
+        <dl class="metric-list">
+          <div>
+            <dt>Pending approvals</dt>
+            <dd>{{ stats().pendingApplications }}</dd>
+          </div>
+          <div>
+            <dt>Approved accounts</dt>
+            <dd>{{ stats().approvedApplications }}</dd>
+          </div>
+          <div>
+            <dt>Locked customers</dt>
+            <dd>{{ stats().lockedUsers }}</dd>
+          </div>
+          <div>
+            <dt>Overdue bills</dt>
+            <dd>{{ stats().overdueBills }}</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+  }
+
+<div class="admin-dashboard">
+
+  <div class="dashboard-header">
+    <h2>Admin Dashboard</h2>
+    <p>Platform overview and system statistics</p>
+  </div>
+
+  <div *ngIf="loading" class="loading-box">
+    Loading dashboard...
+  </div>
+
+  <div class="kpi-grid" *ngIf="!loading && dashboard">
+
+    <div class="kpi-card">
+      <span class="kpi-label">Total Users</span>
+      <strong>{{ dashboard.totalUsers }}</strong>
+    </div>
+
+    <div class="kpi-card">
+      <span class="kpi-label">Active Users</span>
+      <strong>{{ dashboard.totalActiveUsers }}</strong>
+    </div>
+
+    <div class="kpi-card">
+      <span class="kpi-label">Total Loans</span>
+      <strong>{{ dashboard.totalLoans }}</strong>
+    </div>
+
+    <div class="kpi-card warning" [class.active-warning]="dashboard.pendingApprovals > 0">
+      <span class="kpi-label">Pending Approvals</span>
+      <strong>{{ dashboard.pendingApprovals }}</strong>
+      <button type="button" (click)="goTo('applications-pending')">
+        Review
+      </button>
+    </div>
+
+    <div class="kpi-card">
+      <span class="kpi-label">Total Transactions</span>
+      <strong>{{ dashboard.totalTransactions }}</strong>
+    </div>
+
+    <div class="kpi-card">
+      <span class="kpi-label">Platform Savings Rate</span>
+      <strong>{{ dashboard.platformSavingsRate }}%</strong>
+    </div>
+
+  </div>
+
+</div>
+

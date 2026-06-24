@@ -1,0 +1,45 @@
+<!-- notification.component.html -->
+<div class="notification-container">
+  <div
+    *ngFor="let n of notifications$ | async; trackBy: trackById"
+    class="toast"
+    [ngClass]="n.type"
+    [class.removing]="n.removing"
+    role="alert"
+    aria-live="assertive"
+  >
+    <!-- Body -->
+    <div class="toast-body">
+      <!-- Icon -->
+      <span class="toast-icon" aria-hidden="true">
+        <ng-container [ngSwitch]="n.type">
+          <span *ngSwitchCase="'success'">✓</span>
+          <span *ngSwitchCase="'warning'">⚠</span>
+          <span *ngSwitchCase="'danger'">✕</span>
+          <span *ngSwitchDefault>ℹ</span>
+        </ng-container>
+      </span>
+
+      <!-- Text -->
+      <div class="toast-text">
+        <span class="toast-title" *ngIf="n.title">{{ n.title }}</span>
+        <span class="toast-message">{{ n.message }}</span>
+      </div>
+
+      <!-- Close -->
+      <button
+        class="close-btn"
+        (click)="remove(n.id)"
+        aria-label="Dismiss notification"
+      >✕</button>
+    </div>
+
+    <!-- Expiry progress bar -->
+    <div class="toast-progress-track" aria-hidden="true">
+      <div
+        class="toast-progress"
+        [style.--duration]="(n.duration ?? 4000) + 'ms'"
+      ></div>
+    </div>
+  </div>
+</div>

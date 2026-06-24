@@ -1,0 +1,7 @@
+{
+  "version": 3,
+  "sources": ["src/app/features/skeleton-loader/skeleton-loader.css"],
+  "sourcesContent": [".skeleton-wrapper {\r\n  width: 100%;\r\n}\r\n\r\n.skeleton-line {\r\n  height: 22px;\r\n  margin-bottom: 14px;\r\n  border-radius: 8px;\r\n  background: linear-gradient(90deg, #eeeeee 25%, #dddddd 50%, #eeeeee 75%);\r\n  background-size: 200% 100%;\r\n  animation: shimmer 1.2s infinite;\r\n}\r\n\r\n@keyframes shimmer {\r\n  from {\r\n    background-position: 200% 0;\r\n  }\r\n\r\n  to {\r\n    background-position: -200% 0;\r\n  }\r\n}"],
+  "mappings": ";AAAA,CAAC;AACC,SAAO;AACT;AAEA,CAAC;AACC,UAAQ;AACR,iBAAe;AACf,iBAAe;AACf;AAAA,IAAY;AAAA,MAAgB,KAAhB;AAAA,MAAuB,QAAQ,GAA/B;AAAA,MAAoC,QAAQ,GAA5C;AAAA,MAAiD,QAAQ;AACrE,mBAAiB,KAAK;AACtB,aAAW,QAAQ,KAAK;AAC1B;AAEA,WAHa;AAIX;AACE,yBAAqB,KAAK;AAC5B;AAEA;AACE,yBAAqB,MAAM;AAC7B;AACF;",
+  "names": []
+}

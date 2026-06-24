@@ -1,0 +1,304 @@
+<!------- admin-card.component.html ------->
+
+<!-- Layout Alerts -->
+@if (error()) {
+  <div class="page-alert err">
+    <span>{{ error() }}</span>
+    <button (click)="error.set('')">✕</button>
+  </div>
+}
+@if (success()) {
+  <div class="page-alert ok">
+    <span>{{ success() }}</span>
+    <button (click)="success.set('')">✕</button>
+  </div>
+}
+
+<div class="section-head">
+  <div>
+    <h1>Card Management</h1>
+  </div>
+</div>
+
+<!-- Filter Tabs -->
+<div class="ac-tabs">
+  <button class="act-btn" [class.act-active]="filter() === 'ALL'"
+    (click)="switchFilter('ALL')">📋 All Cards</button>
+  <button class="act-btn" [class.act-active]="filter() === 'PENDING'"
+    (click)="switchFilter('PENDING')">⏳ Pending Approval</button>
+  <button class="act-btn" [class.act-active]="filter() === 'BLOCKED'"
+    (click)="switchFilter('BLOCKED')">🔒 Blocked</button>
+</div>
+
+<!-- Search + Stats -->
+<div class="ac-toolbar">
+  <input type="text" class="ac-search" [(ngModel)]="searchQuery"
+    placeholder="Search name, email, card number, account..." />
+  <span class="ac-count">{{ totalElements() }} cards</span>
+  <button class="ac-refresh" (click)="loadCards()" [disabled]="loading()">↺</button>
+</div>
+
+<!-- Table -->
+@if (loading()) {
+  <div class="c-loading"><div class="spin-ring"></div><p>Loading...</p></div>
+} @else if (filteredCards.length === 0) {
+  <div class="placeholder">
+    <div >
+    <h3>No Cards</h3>
+    <p>No cards match the current filter.</p>
+    </div>
+  </div>
+} @else {
+  <div class="ac-table-wrap">
+    <table class="ac-table">
+      <thead>
+        <tr>
+          <th>Card</th>
+          <th>Customer</th>
+          <th>Account</th>
+          <th>Network</th>
+          <th>Status</th>
+          <th>Request</th>
+          <th>Requested On</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (card of filteredCards; track card.id) {
+          <tr>
+            <td>
+              <div class="card-cell">
+                <div class="cc-num">{{ card.maskedCardNumber }}</div>
+                <div class="cc-exp">Exp: {{ card.expiryDisplay }}</div>
+              </div>
+            </td>
+            <td>
+              <div class="cust-cell">
+                <div class="ca-av">
+                  {{ (card.customerFullName || card.customerUsername || 'U')[0].toUpperCase() }}
+                </div>
+                <div>
+                  <div class="ca-name">{{ card.customerFullName }}</div>
+                  <div class="ca-email">{{ card.customerEmail }}</div>
+                </div>
+              </div>
+            </td>
+            <td class="mono">{{ card.accountNumber }}</td>
+            <td>
+              <span class="net-badge">{{ card.network }}</span>
+            </td>
+            <td>
+              <span class="a-badge" [class]="getStatusClass(card.status)">
+                {{ card.status === 'PENDING_APPROVAL' ? 'PENDING' : card.status }}
+              </span>
+            </td>
+            <td>
+              <span class="a-badge" [class]="getReqClass(card.requestStatus)">
+                {{ card.requestStatus }}
+              </span>
+            </td>
+            <td class="date-cell">{{ card.createdAt?.split(',')[0] }}</td>
+            <td>
+              <div class="tbl-acts">
+                <button class="ta-btn" (click)="openDetail(card)">👁 View</button>
+                @if (card.requestStatus === 'PENDING') {
+                  <button class="ta-btn ta-approve"
+                    (click)="approve(card)">✅ Approve</button>
+                }
+                @if (card.status === 'BLOCKED') {
+                  <button class="ta-btn ta-unblock"
+                    (click)="adminUnblock(card)">🔓 Unblock</button>
+                }
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  @if (totalPages() > 1) {
+    <div class="pagination">
+      <button class="pg-btn" (click)="goToPage(0)" [disabled]="page() === 0">«</button>
+      <button class="pg-btn" (click)="goToPage(page()-1)" [disabled]="page() === 0">← Prev</button>
+      @for (p of pageNumbers; track p) {
+        <button class="pg-btn pg-num" [class.pg-active]="p === page()"
+          (click)="goToPage(p)">{{ p+1 }}</button>
+      }
+      <button class="pg-btn" (click)="goToPage(page()+1)" [disabled]="page() >= totalPages()-1">Next →</button>
+      <button class="pg-btn" (click)="goToPage(totalPages()-1)" [disabled]="page() >= totalPages()-1">»</button>
+    </div>
+    <div class="pg-summary">
+      Showing {{ filteredCards.length }} of {{ totalElements() }} · Page {{ page()+1 }} of {{ totalPages() }}
+    </div>
+  }
+}
+
+<!-- ══ DETAIL MODAL ══ -->
+@if (modal() !== 'none' && selectedCard()) {
+  <div class="c-overlay" (click)="modal.set('none')"></div>
+  <div class="c-modal-wrap">
+    <div class="c-modal c-modal-lg">
+
+      @if (modal() === 'detail') {
+        <div class="cm-header">
+          <div class="cmh-title">
+            <span>💳</span>
+            <div>
+              <h3>{{ selectedCard().maskedCardNumber }}</h3>
+              <p>{{ selectedCard().customerFullName }} · {{ selectedCard().network }}</p>
+            </div>
+          </div>
+          <div class="cmh-right">
+            <span class="a-badge" [class]="getReqClass(selectedCard().requestStatus)">
+              {{ selectedCard().requestStatus }}
+            </span>
+            <button class="cm-close" (click)="modal.set('none')">✕</button>
+          </div>
+        </div>
+
+        <div class="cm-body">
+          <!-- Customer Info -->
+          <div class="detail-section">
+            <div class="ds-title">👤 Customer</div>
+            <div class="detail-grid">
+              <div class="dg-item"><span>Name</span><strong>{{ selectedCard().customerFullName }}</strong></div>
+              <div class="dg-item"><span>Email</span><strong>{{ selectedCard().customerEmail }}</strong></div>
+              <div class="dg-item"><span>Phone</span><strong>{{ selectedCard().customerPhone || '—' }}</strong></div>
+              <div class="dg-item"><span>Username</span><strong>{{ selectedCard().customerUsername }}</strong></div>
+            </div>
+          </div>
+
+          <!-- Card Details -->
+          <div class="detail-section">
+            <div class="ds-title">💳 Card Details</div>
+            <div class="detail-grid">
+              <div class="dg-item"><span>Card Number</span><strong class="mono">{{ selectedCard().maskedCardNumber }}</strong></div>
+              <div class="dg-item"><span>Expiry</span><strong>{{ selectedCard().expiryDisplay }}</strong></div>
+              <div class="dg-item"><span>Network</span><strong>{{ selectedCard().network }}</strong></div>
+              <div class="dg-item"><span>Cardholder</span><strong>{{ selectedCard().cardholderName }}</strong></div>
+              <div class="dg-item"><span>Status</span>
+                <strong><span class="a-badge" [class]="getStatusClass(selectedCard().status)">
+                  {{ selectedCard().status }}</span></strong>
+              </div>
+              <div class="dg-item"><span>PIN Set</span><strong>{{ selectedCard().pinSet ? '✅ Yes' : '❌ No' }}</strong></div>
+              <div class="dg-item"><span>Account</span><strong class="mono">{{ selectedCard().accountNumber }}</strong></div>
+              @if (selectedCard().requestReason) {
+                <div class="dg-item dg-full"><span>Request Reason</span><strong>{{ selectedCard().requestReason }}</strong></div>
+              }
+              @if (selectedCard().blockReason) {
+                <div class="dg-item dg-full err-text"><span>Block Reason</span><strong>{{ selectedCard().blockReason }}</strong></div>
+              }
+              @if (selectedCard().rejectionReason) {
+                <div class="dg-item dg-full err-text"><span>Rejection Reason</span><strong>{{ selectedCard().rejectionReason }}</strong></div>
+              }
+              @if (selectedCard().reviewedBy) {
+                <div class="dg-item"><span>Reviewed By</span><strong>{{ selectedCard().reviewedBy }}</strong></div>
+                <div class="dg-item"><span>Reviewed At</span><strong>{{ selectedCard().reviewedAt }}</strong></div>
+              }
+            </div>
+          </div>
+
+          <!-- Limits -->
+          <div class="detail-section">
+            <div class="ds-title">⚙ Transaction Limits</div>
+            <div class="limits-row">
+              <div class="lm-item">
+                <span>🌐 Online</span>
+                <strong>{{ formatAmount(selectedCard().onlineLimit) }}</strong>
+              </div>
+              <div class="lm-item">
+                <span>🏧 ATM</span>
+                <strong>{{ formatAmount(selectedCard().atmLimit) }}</strong>
+              </div>
+              <div class="lm-item">
+                <span>📅 Daily</span>
+                <strong>{{ formatAmount(selectedCard().dailyLimit) }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="modal.set('none')">Close</button>
+          @if (selectedCard().requestStatus === 'PENDING') {
+            <button class="c-btn-reject" (click)="openReject()">❌ Reject</button>
+            <button class="c-btn-approve" (click)="approve(selectedCard())"
+              [disabled]="modalLoading()">
+              @if (modalLoading()) { <span class="spinner"></span> }
+              ✅ Approve Card
+            </button>
+          }
+          @if (selectedCard().status === 'ACTIVE' &&
+               selectedCard().requestStatus === 'APPROVED') {
+            <button class="c-btn-block" (click)="openAdminBlock()">🔒 Block</button>
+          }
+          @if (selectedCard().status === 'BLOCKED') {
+            <button class="c-btn-approve" (click)="adminUnblock(selectedCard())">
+              🔓 Unblock
+            </button>
+          }
+        </div>
+      }
+
+      <!-- REJECT MODE -->
+      @if (modal() === 'reject') {
+        <div class="cm-header">
+          <h3>❌ Reject Card Request</h3>
+          <button class="cm-close" (click)="modal.set('detail')">✕</button>
+        </div>
+        <div class="cm-body">
+          <p class="modal-desc">
+            Rejecting card request for <strong>{{ selectedCard().customerFullName }}</strong>.
+            Customer will be notified via email.
+          </p>
+          @if (rejectError()) { <div class="c-err-box">{{ rejectError() }}</div> }
+          <div class="form-group">
+            <label>Rejection Reason <span class="req">*</span></label>
+            <textarea class="c-input" rows="4"
+              [(ngModel)]="rejectReason"
+              placeholder="e.g. Insufficient KYC, account not in good standing, duplicate request...">
+            </textarea>
+          </div>
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="modal.set('detail')">← Back</button>
+          <button class="c-btn-reject" (click)="confirmReject()"
+            [disabled]="modalLoading()">
+            @if (modalLoading()) { <span class="spinner"></span> }
+            ❌ Confirm Rejection
+          </button>
+        </div>
+      }
+
+      <!-- BLOCK MODE -->
+      @if (modal() === 'block') {
+        <div class="cm-header">
+          <h3>🔒 Block Card</h3>
+          <button class="cm-close" (click)="modal.set('detail')">✕</button>
+        </div>
+        <div class="cm-body">
+          <p class="modal-desc">
+            Blocking card ****{{ selectedCard().last4 }} for
+            <strong>{{ selectedCard().customerFullName }}</strong>.
+          </p>
+          <div class="form-group">
+            <label>Block Reason</label>
+            <input type="text" class="c-input" [(ngModel)]="blockReason"
+              placeholder="e.g. Suspicious activity, customer request..." />
+          </div>
+        </div>
+        <div class="cm-footer">
+          <button class="c-btn-outline" (click)="modal.set('detail')">← Back</button>
+          <button class="c-btn-block" (click)="confirmAdminBlock()"
+            [disabled]="modalLoading()">
+            @if (modalLoading()) { <span class="spinner"></span> }
+            🔒 Block Card
+          </button>
+        </div>
+      }
+
+    </div>
+  </div>
+}

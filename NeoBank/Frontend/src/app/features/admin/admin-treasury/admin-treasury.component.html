@@ -1,0 +1,288 @@
+<!------- admin-treasury.component.html ------->
+
+<div class="section-head">
+  <div>
+    <h1>🏛️ Treasury Management</h1>
+    <p>Manage bank treasuries used for loan disbursements</p>
+  </div>
+  <button class="t-btn-primary" (click)="openCreate()">+ New Treasury</button>
+</div>
+
+<!-- Stats -->
+<div class="stats-grid" style="margin-bottom:24px">
+  <div class="stat-card">
+    <div class="stat-icon">🏛️</div>
+    <div>
+      <div class="stat-val">{{ treasuries().length }}</div>
+      <div class="stat-lbl">Total Treasuries</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">💰</div>
+    <div>
+      <div class="stat-val">{{ formatAmount(totalBalance().toString()) }}</div>
+      <div class="stat-lbl">Total Active Balance</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📤</div>
+    <div>
+      <div class="stat-val">{{ formatAmount(totalDisbursed().toString()) }}</div>
+      <div class="stat-lbl">Total Disbursed</div>
+    </div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">📈</div>
+    <div>
+      <div class="stat-val">{{ formatAmount(totalInterest().toString()) }}</div>
+      <div class="stat-lbl">Interest Earned</div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading -->
+@if (loading()) {
+  <div class="t-loading"><div class="spin-ring"></div><p>Loading treasuries...</p></div>
+}
+
+<!-- Treasury Cards -->
+@else {
+  <div class="treasury-grid">
+    @for (t of treasuries(); track t.id) {
+      <div class="treasury-card" [class.tc-frozen]="t.status === 'FROZEN'"
+        [class.tc-inactive]="t.status === 'INACTIVE'">
+
+        <!-- Card Header -->
+        <div class="tc-header">
+          <div class="tc-title-row">
+            <div class="tc-icon">🏛️</div>
+            <div>
+              <div class="tc-name">{{ t.name }}</div>
+              <div class="tc-code">{{ t.treasuryCode }}</div>
+            </div>
+            <span class="st-badge" [class]="getStatusClass(t.status)">
+              {{ t.status }}
+            </span>
+          </div>
+        </div>
+
+        <!-- Balance -->
+        <div class="tc-balance">
+          <div class="tcb-label">Available Balance</div>
+          <div class="tcb-amount">{{ formatAmount(t.balance) }}</div>
+        </div>
+
+        <!-- Stats -->
+        <div class="tc-stats">
+          <div class="tcs-item">
+            <span>Total Disbursed</span>
+            <strong class="tcs-out">{{ formatAmount(t.totalDisbursed) }}</strong>
+          </div>
+          <div class="tcs-item">
+            <span>Total Recovered</span>
+            <strong class="tcs-in">{{ formatAmount(t.totalRecovered) }}</strong>
+          </div>
+          <div class="tcs-item">
+            <span>Interest Earned</span>
+            <strong class="tcs-int">{{ formatAmount(t.totalInterestEarned) }}</strong>
+          </div>
+        </div>
+
+        @if (t.description) {
+          <div class="tc-desc">{{ t.description }}</div>
+        }
+
+        <!-- Actions -->
+        <div class="tc-actions">
+          <button class="t-btn-sm" (click)="openDetail(t)">👁 View</button>
+          @if (t.status === 'ACTIVE') {
+            <button class="t-btn-sm t-btn-topup" (click)="openTopUp(t)">+ Top Up</button>
+            <button class="t-btn-sm t-btn-freeze" (click)="updateStatus(t, 'FROZEN')">❄ Freeze</button>
+          }
+          @if (t.status === 'FROZEN') {
+            <button class="t-btn-sm t-btn-activate" (click)="updateStatus(t, 'ACTIVE')">✅ Activate</button>
+          }
+          @if (t.status === 'INACTIVE') {
+            <button class="t-btn-sm t-btn-activate" (click)="updateStatus(t, 'ACTIVE')">✅ Activate</button>
+          }
+          @if (t.status === 'ACTIVE') {
+            <button class="t-btn-sm t-btn-deact" (click)="updateStatus(t, 'INACTIVE')">⏸ Deactivate</button>
+          }
+        </div>
+
+        <div class="tc-footer">Created by {{ t.createdBy }} · {{ t.createdAt?.split(',')[0] }}</div>
+      </div>
+    }
+  </div>
+}
+
+<!-- ══ MODALS ══ -->
+@if (modalMode() !== 'none') {
+  <div class="t-overlay" (click)="closeModal()"></div>
+  <div class="t-modal-wrap">
+    <div class="t-modal">
+
+      <!-- ── CREATE ── -->
+      @if (modalMode() === 'create') {
+        <div class="tm-header">
+          <h3>🏛️ Create New Treasury</h3>
+          <button class="tm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="tm-body">
+          @if (createError()) { <div class="t-err-box">{{ createError() }}</div> }
+
+          <div class="form-group">
+            <label>Treasury Name <span class="req">*</span></label>
+            <input type="text" class="t-input" [(ngModel)]="createName"
+              placeholder="e.g. NeoBank Home Loan Fund" />
+          </div>
+
+          <div class="form-group">
+            <label>Description</label>
+            <textarea class="t-input" rows="3" [(ngModel)]="createDesc"
+              placeholder="Brief description of this treasury's purpose..."></textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Initial Balance (₹)</label>
+            <div class="amount-wrap">
+              <span class="rupee">₹</span>
+              <input type="number" class="t-input amount-inp"
+                [(ngModel)]="createBalance"
+                placeholder="0.00 (can top up later)" min="0" />
+            </div>
+            <span class="field-hint">Opening balance for this treasury. Can be topped up later.</span>
+          </div>
+
+          <!-- Quick amounts -->
+          <div class="quick-chips">
+            <span class="qc-label">Quick:</span>
+            @for (amt of ['1000000','10000000','100000000','500000000','1000000000']; track amt) {
+              <button class="qc-chip" (click)="createBalance = amt">
+                ₹{{ formatAmount(amt).replace('₹','') }}
+              </button>
+            }
+          </div>
+        </div>
+        <div class="tm-footer">
+          <button class="t-btn-outline" (click)="closeModal()">Cancel</button>
+          <button class="t-btn-primary" (click)="createTreasury()"
+            [disabled]="modalLoading()">
+            @if (modalLoading()) { <span class="spinner"></span> }
+            🏛️ Create Treasury
+          </button>
+        </div>
+      }
+
+      <!-- ── TOP UP ── -->
+      @if (modalMode() === 'topup') {
+        <div class="tm-header">
+          <h3>+ Top Up — {{ selectedT().name }}</h3>
+          <button class="tm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="tm-body">
+          <div class="topup-current">
+            <span>Current Balance</span>
+            <strong>{{ formatAmount(selectedT().balance) }}</strong>
+          </div>
+
+          @if (topUpError()) { <div class="t-err-box">{{ topUpError() }}</div> }
+
+          <div class="form-group">
+            <label>Top-up Amount (₹) <span class="req">*</span></label>
+            <div class="amount-wrap">
+              <span class="rupee">₹</span>
+              <input type="number" class="t-input amount-inp"
+                [(ngModel)]="topUpAmount" placeholder="0.00" min="1" />
+            </div>
+          </div>
+
+          <div class="quick-chips">
+            <span class="qc-label">Quick:</span>
+            @for (amt of ['1000000','10000000','50000000','100000000','500000000']; track amt) {
+              <button class="qc-chip" (click)="topUpAmount = amt">
+                ₹{{ formatAmount(amt).replace('₹','') }}
+              </button>
+            }
+          </div>
+
+          <div class="form-group">
+            <label>Description</label>
+            <input type="text" class="t-input" [(ngModel)]="topUpDesc"
+              placeholder="e.g. Q2 fund allocation" />
+          </div>
+
+          @if (topUpAmount) {
+            <div class="topup-preview">
+              New Balance After Top-up:
+              <strong>{{ formatAmount((parseFloat(selectedT().balance) + parseFloat(topUpAmount)).toString()) }}</strong>
+            </div>
+          }
+        </div>
+        <div class="tm-footer">
+          <button class="t-btn-outline" (click)="closeModal()">Cancel</button>
+          <button class="t-btn-primary" (click)="confirmTopUp()"
+            [disabled]="modalLoading()">
+            @if (modalLoading()) { <span class="spinner"></span> }
+            + Confirm Top Up
+          </button>
+        </div>
+      }
+
+      <!-- ── DETAIL ── -->
+      @if (modalMode() === 'detail' && selectedT()) {
+        <div class="tm-header">
+          <h3>🏛️ {{ selectedT().name }}</h3>
+          <button class="tm-close" (click)="closeModal()">✕</button>
+        </div>
+        <div class="tm-body">
+          <div class="detail-hero">
+            <div class="dh-balance">{{ formatAmount(selectedT().balance) }}</div>
+            <div class="dh-label">Available Balance</div>
+            <span class="st-badge" [class]="getStatusClass(selectedT().status)">{{ selectedT().status }}</span>
+          </div>
+
+          <div class="detail-grid">
+            <div class="dg-item"><span>Treasury Code</span><strong class="mono">{{ selectedT().treasuryCode }}</strong></div>
+            <div class="dg-item"><span>Created By</span><strong>{{ selectedT().createdBy }}</strong></div>
+            <div class="dg-item"><span>Created At</span><strong>{{ selectedT().createdAt }}</strong></div>
+            <div class="dg-item"><span>Last Updated</span><strong>{{ selectedT().updatedAt }}</strong></div>
+            <div class="dg-item"><span>Total Disbursed</span><strong class="out-val">{{ formatAmount(selectedT().totalDisbursed) }}</strong></div>
+            <div class="dg-item"><span>Total Recovered</span><strong class="in-val">{{ formatAmount(selectedT().totalRecovered) }}</strong></div>
+            <div class="dg-item"><span>Interest Earned</span><strong class="int-val">{{ formatAmount(selectedT().totalInterestEarned) }}</strong></div>
+            @if (selectedT().description) {
+              <div class="dg-item dg-full"><span>Description</span><strong>{{ selectedT().description }}</strong></div>
+            }
+          </div>
+
+          <!-- Net position -->
+          <div class="net-box">
+            <div class="nb-label">Net Position (Recovered + Balance vs Disbursed)</div>
+            <div class="nb-items">
+              <div class="nb-item">
+                <span>Disbursed</span>
+                <strong class="out-val">{{ formatAmount(selectedT().totalDisbursed) }}</strong>
+              </div>
+              <div class="nb-item">
+                <span>Recovered</span>
+                <strong class="in-val">{{ formatAmount(selectedT().totalRecovered) }}</strong>
+              </div>
+              <div class="nb-item">
+                <span>Interest Profit</span>
+                <strong class="int-val">{{ formatAmount(selectedT().totalInterestEarned) }}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="tm-footer">
+          <button class="t-btn-outline" (click)="closeModal()">Close</button>
+          @if (selectedT().status === 'ACTIVE') {
+            <button class="t-btn-topup-big" (click)="closeModal(); openTopUp(selectedT())">
+              + Top Up
+            </button>
+          }
+        </div>
+      }
+    </div>
+  </div>
+}

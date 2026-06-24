@@ -1,0 +1,170 @@
+<!-- ✅ isDarkMode() is now a computed signal from ThemeService — works reactively -->
+<div class="admin-shell" [class.dark]="isDarkMode()">
+
+  @if (isMobile() && sidebarOpen()) {
+  <div class="overlay" (click)="closeSidebar()"></div>
+  }
+
+  <!-- ══ SIDEBAR ══ -->
+  <app-admin-sidebar [sidebarOpen]="sidebarOpen()" [sidebarCollapsed]="sidebarCollapsed()"
+    [currentSection]="currentSection()" [username]="adminUser()?.username || ''"
+    [fullName]="adminUser()?.fullName || ''" [role]="adminUser()?.role || ''" [pendingCount]="pendingCount()"
+    (sectionSelected)="onSectionSelected($event)" (closeSidebarEvt)="closeSidebar()"
+    (openSidebarCollapsed)="toggleSidebarOpenCollapsed()" (logoutEvt)="logout()"></app-admin-sidebar>
+
+  <!-- ══ MAIN ══ -->
+  <div class="main" [class.main-collapsed]="sidebarCollapsed() && !isMobile()">
+
+    <!-- ✅ removed [isDarkMode] and (cycleThemeEvt) — header owns theme now -->
+    <app-admin-header [username]="adminUser()?.username || ''" [fullName]="adminUser()?.fullName || ''"
+      [role]="adminUser()?.role || ''" [pageTitle]="getPageTitle()" (toggleSidebarEvt)="toggleSidebar()"
+      (logoutEvt)="logout()"></app-admin-header>
+
+    <!-- Alerts -->
+    @if (error()) {
+    <div class="pg-alert err">
+      <span>{{ error() }}</span>
+      <button (click)="error.set('')">✕</button>
+    </div>
+    }
+    @if (success()) {
+    <div class="pg-alert ok">
+      <span>{{ success() }}</span>
+      <button (click)="success.set('')">✕</button>
+    </div>
+    }
+
+    <!-- ══ CONTENT ══ -->
+    <main class="content">
+
+      @if (currentSection() === 'dashboard') {
+      <app-admin-dashboard (navigateTo)="onSectionSelected($event)"></app-admin-dashboard>
+      }
+
+      @if (isApplicationSection()) {
+      <app-admin-application [activeSubSection]="currentSection()"
+        (pendingCountChange)="pendingCount.set($event)"></app-admin-application>
+      }
+
+      @if (isUsersSection()) {
+      <app-admin-user [activeSubSection]="currentSection()"></app-admin-user>
+      }
+
+      @if (isAccountsSection()) {
+      <app-admin-account [activeSubSection]="currentSection()"></app-admin-account>
+      }
+
+      @if (isTransactionSection()) {
+      <app-admin-transaction></app-admin-transaction>
+      }
+
+      @if (currentSection() === 'analytics') {
+      <app-admin-analytics></app-admin-analytics>
+      }
+
+
+      @if (isProfileSection()) {
+      <app-admin-profile [activeSubSection]="currentSection()" [user]="adminUser()"></app-admin-profile>
+      }
+
+      @if (isAccountRequestSection()) {
+      <app-admin-account-request></app-admin-account-request>
+      }
+
+
+      <!-- @if (currentSection() === 'loans') {
+  <app-admin-loan
+
+  ></app-admin-loan>
+} -->
+
+      <!-- admin-layout.component.html — update loans section: -->
+
+      @if (currentSection() === 'loans') {
+      <div class="loan-content">
+        <!-- Sub-tabs for Loan Management -->
+        <div class="loan-sub-tabs">
+          <button class="lst-btn" [class.lst-active]="loanSubTab === 'applications'"
+            (click)="loanSubTab = 'applications'">
+            📋 Applications
+          </button>
+          <button class="lst-btn" [class.lst-active]="loanSubTab === 'products'" (click)="loanSubTab = 'products'">
+            🏦 Loan Products
+          </button>
+        </div>
+
+        @if (loanSubTab === 'applications') {
+        <app-admin-loan>
+        </app-admin-loan>
+        }
+        @if (loanSubTab === 'products') {
+        <app-admin-loan-product></app-admin-loan-product>
+        }
+      </div>
+      }
+
+      <!-- @if (currentSection() === 'loans') {
+  <app-admin-loan
+    (pendingCount)="onLoanPendingCount($event)"
+  ></app-admin-loan>
+} -->
+
+      <!-- admin-layout.component.html — add: -->
+      @if (currentSection() === 'treasury') {
+      <app-admin-treasury></app-admin-treasury>
+      }
+
+      <!-- admin-layout.component.html — add: -->
+      @if (currentSection() === 'cards') {
+      <app-admin-card></app-admin-card>
+      }
+
+      @if (isSystemLogsSection()) {
+      <app-system-logs></app-system-logs>
+      }
+
+      <!-- ✅ FIX: Added management sections -->
+      @if (isManagementAdminsSection()) {
+      <app-admin-management [activeSubSection]="'admins'"></app-admin-management>
+      }
+
+      @if (isManagementSettingsSection()) {
+      <app-admin-management [activeSubSection]="'settings'"></app-admin-management>
+      }
+
+      @if (
+      currentSection() !== 'dashboard' &&
+      !isApplicationSection() &&
+      !isUsersSection() &&
+      !isAccountsSection() &&
+      !isTransactionSection() &&
+      !isProfileSection() &&
+      !isAccountRequestSection() &&
+      !(currentSection() === 'loans') &&
+      !(currentSection() === 'cards') &&
+      !(currentSection() === 'treasury') &&
+      !isSystemLogsSection() &&
+      !isManagementAdminsSection() &&
+      !isManagementSettingsSection()
+      ) {
+      <div class="section-head">
+        <h1>{{ getPageTitle() }}</h1>
+        <p>This section is under development</p>
+      </div>
+      <div class="placeholder">
+        <div class="ph-icon">🔧</div>
+        <h3>{{ getPageTitle() }}</h3>
+        <p>Add your component here following the same pattern as Applications.</p>
+      </div>
+      }
+
+    </main>
+
+    <footer class="page-footer">
+      <span>© 2026 NeoBank Admin</span>
+      <span>v1.0.0</span>
+    </footer>
+
+  </div>
+
+</div>
